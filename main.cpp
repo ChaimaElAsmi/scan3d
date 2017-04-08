@@ -3,6 +3,8 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+#include <leopard.hpp>
+
 
 using namespace cv;
 using namespace std;
@@ -15,10 +17,39 @@ double horloge() {
 }
 
 
+void testLeopard() {
+    printf("----- test leopard -----\n");
+    leopard *L=new leopard();
+    /// lire des images
+    L->readImages(LEOPARD_CAM,(char *)"cam1/cam%03d.jpg",0,29);
+
+    printf("test\n");
+    delete L;
+    printf("----- done -----\n");
+}
+
+
+
+
+
 int main(int argc, char *argv[]) {
 
     int nbImages = 100;
     Mat img[nbImages];
+
+
+    // options
+    for(int i=1;i<argc;i++) {
+		if( strcmp("-h",argv[i])==0 ) {
+			printf("Usage: %s -h\n",argv[0]);
+			exit(0);
+		}
+    }
+
+
+
+    testLeopard();
+    exit(0);
 
     VideoCapture cap(1);
     if(!cap.isOpened())
