@@ -42,7 +42,8 @@ class leopard {
 	leopard(); //int w,int h, int nb, int freq, bool blur,string pid);
 	~leopard();
 
-    int readImages(int which,char *name,int from,int to);
+    cv::Mat *readImages(char *name,int from,int to);
+    void computeMinMax(cv::Mat *img,int nb,cv::Mat &min,cv::Mat &max);
 
 
   private:

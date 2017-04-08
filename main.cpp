@@ -21,7 +21,20 @@ void testLeopard() {
     printf("----- test leopard -----\n");
     leopard *L=new leopard();
     /// lire des images
-    L->readImages(LEOPARD_CAM,(char *)"cam1/cam%03d.jpg",0,29);
+    Mat *images;
+    images=L->readImages((char *)"data/cam1/cam%03d.jpg",0,29);
+
+
+    Mat iMin,iMax;
+    L->computeMinMax(images,30,iMin,iMax);
+
+    imwrite("minCam.png",iMin);
+    imwrite("maxCam.png",iMax);
+
+    delete[] images;
+
+
+
 
     printf("test\n");
     delete L;

@@ -23,30 +23,60 @@ leopard::leopard() {
 
 leopard::~leopard() { printf("leopard uninit!\n"); }
 
-int leopard::readImages(int which,char *name,int from,int to) {
+cv::Mat *leopard::readImages(char *name,int from,int to) {
     printf("-- reading images %s --\n",name);
     int nb,i;
     char buf[300];
-    Mat image;
+    nb=to-from+1;
+    Mat *image=new Mat[nb];
     int w=0,h=0;
-    for(i=from,nb=0;i<=to;i++,nb++) {
-        sprintf(buf,name,i);
+    for(i=0;i<nb;i++) {
+        sprintf(buf,name,i+from);
         printf("read %s\n",buf);
-        image = imread(buf,CV_LOAD_IMAGE_GRAYSCALE);
-        printf("loaded %d x %d\n",image.cols,image.rows);
-        if( nb==0 ) {
-            w=image.cols;
-            h=image.rows;
+        image[i] = imread(buf,CV_LOAD_IMAGE_GRAYSCALE);
+        printf("loaded %d x %d\n",image[i].cols,image[i].rows);
+        if( i==0 ) {
+            w=image[i].cols;
+            h=image[i].rows;
         }else{
-            if( w!=image.cols || h!=image.rows ) {
-                printf("Images %d pas de la meme taille!\n",i);
-                return -1;
+            if( w!=image[i].cols || h!=image[i].rows ) {
+                printf("Images %d pas de la meme taille!\n",i+from);
+                delete[] image;
+                return NULL;
             }
         }
     }
     printf("nb=%d\n",nb);
-    return 0;
+    return image;
 }
+
+
+void leopard::computeMinMax(cv::Mat *img,int nb,cv::Mat &min,cv::Mat &delta) {
+    int nr=img[0].rows;
+    int nc=img[0].cols;
+    cv::Mat max;
+    min.create(nr,nc,CV_8UC1);
+    max.create(nr,nc,CV_8UC1);
+    delta.create(nr,nc,CV_8UC1);
+    
+    unsigned char *pmin=min.data;
+    unsigned char *pmax=max.data;
+
+    for(int i=0;i<nb;i++) {
+		unsigned char *p=img[i].data;
+        if( i==0 ) {
+            for(int j=0;j<nr*nc;j++) pmin[j]=pmax[j]=p[j];
+        }else{
+            for(int j=0;j<nr*nc;j++) {
+                if( p[j]<pmin[j] ) pmin[j]=p[j];
+                if( p[j]>pmax[j] ) pmax[j]=p[j];
+            }
+        }
+    }
+    unsigned char *pdelta=delta.data;
+    for(int j=0;j<nr*nc;j++) pdelta[j]=pmax[j]-pmin[j];
+}
+
 
 
 #if 0
