@@ -22,14 +22,15 @@ void testLeopard() {
     leopard *L=new leopard();
     /// lire des images
     Mat *images;
-    images=L->readImages((char *)"data/cam1/cam%03d.jpg",0,29);
+    int nb=30;
+    images=L->readImages((char *)"data/cam1/cam%03d.jpg",0,nb-1);
 
 
-    Mat iMin,iMax;
-    L->computeMinMax(images,30,iMin,iMax);
+    Mat iMin,iDelta;
+    L->computeMinMax(images,nb,iMin,iDelta);
 
     imwrite("minCam.png",iMin);
-    imwrite("maxCam.png",iMax);
+    imwrite("deltaCam.png",iDelta);
 
     delete[] images;
 

@@ -46,7 +46,7 @@ cv::Mat *leopard::readImages(char *name,int from,int to) {
             }
         }
     }
-    printf("nb=%d\n",nb);
+    //printf("nb=%d\n",nb);
     return image;
 }
 
@@ -57,24 +57,97 @@ void leopard::computeMinMax(cv::Mat *img,int nb,cv::Mat &min,cv::Mat &delta) {
     cv::Mat max;
     min.create(nr,nc,CV_8UC1);
     max.create(nr,nc,CV_8UC1);
-    delta.create(nr,nc,CV_8UC1);
+    cv::Mat sum,sum2;
+    sum.create(nr,nc,CV_32SC1);
+    sum2.create(nr,nc,CV_32SC1);
     
     unsigned char *pmin=min.data;
     unsigned char *pmax=max.data;
+    int *psum=(int *)sum.data;
+    int *psum2=(int *)sum2.data;
 
     for(int i=0;i<nb;i++) {
 		unsigned char *p=img[i].data;
         if( i==0 ) {
-            for(int j=0;j<nr*nc;j++) pmin[j]=pmax[j]=p[j];
+            for(int j=0;j<nr*nc;j++) {
+                pmin[j]=pmax[j]=p[j];
+                psum[j]=p[j];
+                psum2[j]=(int)p[j]*(int)p[j];
+            }
         }else{
             for(int j=0;j<nr*nc;j++) {
                 if( p[j]<pmin[j] ) pmin[j]=p[j];
                 if( p[j]>pmax[j] ) pmax[j]=p[j];
+                psum[j]+=p[j];
+                psum2[j]+=(int)p[j]*(int)p[j];
             }
         }
     }
+
+    // calcule delta=max-min
+    delta.create(nr,nc,CV_8UC1);
     unsigned char *pdelta=delta.data;
     for(int j=0;j<nr*nc;j++) pdelta[j]=pmax[j]-pmin[j];
+
+    // calcule la moyenne
+    cv::Mat mean,std;
+    mean.create(nr,nc,CV_8UC1);
+    std.create(nr,nc,CV_8UC1);
+    unsigned char *pmean=mean.data;
+    unsigned char *pstd=std.data;
+    for(int j=0;j<nr*nc;j++) {
+        pmean[j]=(psum[j]*2+nb)/(2*nb);
+        pstd[j]=(int)sqrt((double)psum2[j]/nb-(double)pmean[j]*pmean[j]);
+    }
+
+    //printf("nb=%d  sum=%d  val=%d\n",nb,pmean[1228*nc+921],pmean8[1228*nc+921]);
+    // calcule la moyenne/deviation standard de chaque cote de la moyenne
+    cv::Mat sumL,sumH; // somme si <moyenne, si >moyenne
+    cv::Mat sum2L,sum2H; // somme des carres
+    cv::Mat countL,countH;
+    sumL.create(nr,nc,CV_32SC1);
+    sumH.create(nr,nc,CV_32SC1);
+    sum2L.create(nr,nc,CV_32SC1);
+    sum2H.create(nr,nc,CV_32SC1);
+    countL.create(nr,nc,CV_32SC1);
+    countH.create(nr,nc,CV_32SC1);
+
+    int *psumL=(int *)sumL.data;
+    int *psum2L=(int *)sum2L.data;
+    int *psumH=(int *)sumH.data;
+    int *psum2H=(int *)sum2H.data;
+    int *pcountL=(int *)countL.data;
+    int *pcountH=(int *)countH.data;
+
+    for(int j=0;j<nr*nc;j++) { psumL[j]=psum2L[j]=psumH[j]=psum2H[j]=pcountL[j]=pcountH[j]=0; }
+
+    for(int i=0;i<nb;i++) {
+		unsigned char *p=img[i].data;
+        for(int j=0;j<nr*nc;j++) {
+            if( p[j]<pmean[j] ) { psumL[j]+=p[j];psum2L[j]+=(int)p[j]*p[j];pcountL[j]+=1; }
+            else if( p[j]>pmean[j] ) { psumH[j]+=p[j];psum2H[j]+=(int)p[j]*p[j];pcountH[j]+=1; }
+        }
+    }
+
+    // on veut comparer la deviation standard de chaque cote avec la distance entre les moyennes
+    // ratio (m2-m1)/std si c'est <=1 unimodal si >>1 bimodal
+    cv::Mat bimod;
+    bimod.create(nr,nc,CV_8UC1);
+    unsigned char *pbimod=bimod.data;
+
+    for(int j=0;j<nr*nc;j++) {
+        int cL=(pcountL[j]==0?1:pcountL[j]);
+        int cH=(pcountH[j]==0?1:pcountH[j]);
+        double mL=psumL[j]/cL;
+        double mH=psumH[j]/cH;
+        double stdL=(int)sqrt((double)psum2L[j]/pcountL[j]-(double)mL*mL);
+        double stdH=(int)sqrt((double)psum2H[j]/pcountH[j]-(double)mH*mH);
+        pbimod[j]=(mH-mL)/((stdL+stdH)/2+5)*20;
+    }
+
+    imwrite("mean.png",mean);
+    imwrite("std.png",std);
+    imwrite("bimod.png",bimod);
 }
 
 
