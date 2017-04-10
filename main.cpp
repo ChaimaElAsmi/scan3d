@@ -19,22 +19,41 @@ double horloge() {
 
 void testLeopard() {
     printf("----- test leopard -----\n");
+
+
+    printf("sizeof char %d\n",(int)sizeof(char));
+    printf("sizeof short %d\n",(int)sizeof(short));
+    printf("sizeof int %d\n",(int)sizeof(int));
+    printf("sizeof long %d\n",(int)sizeof(long));
+    printf("sizeof long long %d\n",(int)sizeof(long long));
+
     leopard *L=new leopard();
     /// lire des images
-    Mat *images;
-    int nb=30;
-    images=L->readImages((char *)"data/cam1/cam%03d.jpg",0,nb-1);
+    int nb=64;
+    Mat *imagesCam;
+    imagesCam=L->readImages((char *)"data/cam1/cam%03d.jpg",0,nb-1);
+    L->computeMask(1,imagesCam,nb,1.45,5.0,1,0,0);
+    L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
+    //L->computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
+    delete[] imagesCam;
 
+    Mat *imagesProj;
+    imagesProj=L->readImages((char *)"data/proj1/leopard_2560_1080_32B_%03d.jpg",0,nb-1);
+    L->computeMask(0,imagesProj,nb,1.45,5.0,1,0,0);
+    //L->computeCodes(0,LEOPARD_QUADRATIC,imagesProj);
+    L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
+    delete[] imagesProj;
 
-    Mat iMin,iDelta;
-    L->computeMinMax(images,nb,iMin,iDelta);
+    L->prepareMatch();
+    L->forceBrute();
 
-    imwrite("minCam.png",iMin);
-    imwrite("deltaCam.png",iDelta);
+    cv::Mat lutCam;
+    cv::Mat lutProj;
+    L->makeLUT(lutCam,0);
+    L->makeLUT(lutProj,1);
 
-    delete[] images;
-
-
+    imwrite("lutcam.png",lutCam);
+    imwrite("lutproj.png",lutProj);
 
 
     printf("test\n");

@@ -19,9 +19,31 @@ using namespace cv;
 
 leopard::leopard() {
     printf("leopard init!\n");
+    n=0;
+	maskCam=NULL;
+	maskProj=NULL;
+    codeCam=NULL;
+    codeProj=NULL;
+	matchCam=NULL;
+	matchProj=NULL;
 }
 
-leopard::~leopard() { printf("leopard uninit!\n"); }
+leopard::~leopard() {
+	printf("leopard uninit!\n");
+	if( maskProj ) free(maskProj);
+	if( maskCam ) free(maskCam);
+    if( codeCam ) free(codeCam);
+    if( codeProj ) free(codeProj);
+	if( matchCam ) free(matchCam);
+	if( matchProj ) free(matchProj);
+}
+
+
+double leopard::horloge() {
+	struct timeval tv;
+	gettimeofday(&tv,NULL);
+	return((double)tv.tv_sec+tv.tv_usec/1000000.0);
+}
 
 cv::Mat *leopard::readImages(char *name,int from,int to) {
     printf("-- reading images %s --\n",name);
@@ -34,7 +56,7 @@ cv::Mat *leopard::readImages(char *name,int from,int to) {
         sprintf(buf,name,i+from);
         printf("read %s\n",buf);
         image[i] = imread(buf,CV_LOAD_IMAGE_GRAYSCALE);
-        printf("loaded %d x %d\n",image[i].cols,image[i].rows);
+        //printf("loaded %d x %d\n",image[i].cols,image[i].rows);
         if( i==0 ) {
             w=image[i].cols;
             h=image[i].rows;
@@ -46,15 +68,21 @@ cv::Mat *leopard::readImages(char *name,int from,int to) {
             }
         }
     }
-    //printf("nb=%d\n",nb);
     return image;
 }
 
+//
+// On calcule un ratio binmodal/unimodal
+// Normalement, si c'est >1, c' esst bimodal.
+// cam: 1=oui, 0=non (donc proj)
+// step: 1= normal, 4=keep only one pixel per 4 inx, 4 in y
+// offx,offy : decallage x,y. DOIT ETRE <step
+//
 
-void leopard::computeMinMax(cv::Mat *img,int nb,cv::Mat &min,cv::Mat &delta) {
+void leopard::computeMask(int cam,cv::Mat *img,int nb,double seuil,double bias,int step,int offx,int offy) {
     int nr=img[0].rows;
     int nc=img[0].cols;
-    cv::Mat max;
+    cv::Mat min,max,delta,mask;
     min.create(nr,nc,CV_8UC1);
     max.create(nr,nc,CV_8UC1);
     cv::Mat sum,sum2;
@@ -133,7 +161,9 @@ void leopard::computeMinMax(cv::Mat *img,int nb,cv::Mat &min,cv::Mat &delta) {
     // ratio (m2-m1)/std si c'est <=1 unimodal si >>1 bimodal
     cv::Mat bimod;
     bimod.create(nr,nc,CV_8UC1);
+    mask.create(nr,nc,CV_8UC1);
     unsigned char *pbimod=bimod.data;
+    unsigned char *pmask=mask.data;
 
     for(int j=0;j<nr*nc;j++) {
         int cL=(pcountL[j]==0?1:pcountL[j]);
@@ -142,14 +172,241 @@ void leopard::computeMinMax(cv::Mat *img,int nb,cv::Mat &min,cv::Mat &delta) {
         double mH=psumH[j]/cH;
         double stdL=(int)sqrt((double)psum2L[j]/pcountL[j]-(double)mL*mL);
         double stdH=(int)sqrt((double)psum2H[j]/pcountH[j]-(double)mH*mH);
-        pbimod[j]=(mH-mL)/((stdL+stdH)/2+5)*20;
+        double v=(mH-mL)/((stdL+stdH)/2+bias); // le +5 est pour limiter l'effet lorsque mH-mL -> 0
+        pbimod[j]=v*20;
+        pmask[j]=(v>=seuil)?255:0;
     }
 
+	// set values for the future
+	if( cam ) {
+		wc=nc;hc=nr;
+		maskCam=(unsigned char *)malloc(wc*hc);
+		for(int j=0;j<wc*hc;j++) maskCam[j]=0;
+		for(int y=offy;y<hc;y+=step) for(int x=offx;x<wc;x+=step) maskCam[y*wc+x]=pmask[y*wc+x];
+        // ajuste le mask pour l'image
+		for(int j=0;j<wc*hc;j++) if( maskCam[j]==0 ) pmask[j]=0;
+        if( n>0 && n!=nb ) { printf("Cam et Proj : pas le meme nombre d'images!!!!\n");exit(0); }
+        n=nb;
+	}else{
+		wp=nc;hp=nr;
+		maskProj=(unsigned char *)malloc(wp*hp);
+		for(int j=0;j<wp*hp;j++) maskProj[j]=0;
+		for(int y=offy;y<hp;y+=step) for(int x=offx;x<wp;x+=step) maskProj[y*wp+x]=pmask[y*wp+x];
+        // ajuste le mask pour l'image
+		for(int j=0;j<wp*hp;j++) if( maskProj[j]==0 ) pmask[j]=0;
+        if( n>0 && n!=nb ) { printf("Cam et Proj : pas le meme nombre d'images!!!!\n");exit(0); }
+        n=nb;
+	}
+
+    /*
     imwrite("mean.png",mean);
     imwrite("std.png",std);
     imwrite("bimod.png",bimod);
+    imwrite("delta.png",delta);
+    imwrite("min.png",min);
+    imwrite("max.png",max);
+    */
+    imwrite("mask.png",mask);
 }
 
+
+void leopard::dumpCode(unsigned long *c) {
+    int one=0;
+	for(int i=0;i<nbb;i++) {
+        int b=i/64;
+        unsigned long mask=1L<<(i%64);
+        if( c[b]&mask ) {one++;printf("1");} else printf("0");
+    }
+    printf(" [%d/%d] ",nbb-one,one);
+}
+
+
+void leopard::computeCodes(int cam,int type,cv::Mat *img) {
+    printf("-- compute codes cam=%d type=%d n=%d --\n",cam,type,n);
+
+    int w,h;
+    unsigned long *code=NULL; // [w*h*nb] [(y*w+x)*nb+b]
+    unsigned char *pmask;
+
+    if( cam ) {
+        w=wc;h=hc;
+        if( codeCam ) free(codeCam);
+        if( !maskCam ) { printf("cam: No mask to compute codes!\n");exit(0); }
+        pmask=maskCam;
+    }else{
+        w=wp;h=hp;
+        if( codeProj ) free(codeProj);
+        if( !maskProj ) { printf("proj: No mask to compute codes!\n");exit(0); }
+        pmask=maskProj;
+		printf("*** WP=%d HP=%d\n",wp,hp);
+    }
+
+
+    if( type==LEOPARD_SIMPLE ) {
+        // compare chaque image a l'image moyenne
+        nbb=n;
+        nb=(nbb+63)/64; // parce qu'on utilise des long
+        printf("nbb=%d nb=%d\n",nbb,nb);
+        code=(unsigned long *)malloc(w*h*nb*sizeof(unsigned long));
+        for(int i=0;i<w*h*nb;i++) code[i]=0;
+
+        // trouve l'image moyenne
+        cv::Mat sum;
+        sum.create(h,w,CV_32SC1);
+        int *psum=(int *)sum.data;
+		for(int j=0;j<w*h;j++) psum[j]=0;
+        for(int i=0;i<n;i++) {
+            unsigned char *p=img[i].data;
+            for(int j=0;j<w*h;j++) psum[j]+= *p++;
+        }
+        cv::Mat mean;
+        mean.create(h,w,CV_16UC1);
+        unsigned short *pmean=(unsigned short *)mean.data;
+        // 8 bits de precision
+        for(int j=0;j<w*h;j++) pmean[j]=(psum[j]*256*2+n)/(2*n);
+        //imwrite("meancode.png",mean);
+
+
+        int ambigu=0;
+        int count=0;
+        for(int j=0;j<w*h;j++) {
+            int b; // which long is it?
+            unsigned long mask; // which bit is it in b? (start at bit 0)
+            if( pmask[j]==0 ) continue; // tous les codes en dehors du mask sont 0
+            count++;
+            for(int i=0;i<n;i++) {
+                b=i/64;
+                mask=1L<<(i%64);
+                unsigned char *p=img[i].data;
+                unsigned short v=(p[j]<<8)|0x80;
+                if( v>pmean[j] || (v==pmean[j] && (rand()&1)) ) code[j*nb+b]|=mask;
+                if( v==pmean[j] ) { ambigu++; } // ne sert plus a rien
+                //if( j==900*w+1200 ) { printf("image[%2d] = %d = %d, mean=%d\n",i,p[j],v,pmean[j]); }
+            }
+            if( (j%w)==1200 && (j/w)==900 ) {
+                printf("pixel (%d,%d) : ",j%w,j/w);
+                dumpCode(code+(j*nb));
+                printf("\n");
+            }
+        }
+
+        printf("count=%d (%d %%), ambigu=%d\n",count,count*100/(w*h),ambigu);
+    }else if( type==LEOPARD_QUADRATIC ) {
+        nbb=n*(n-1)/2; // quadratic!
+        nb=(nbb+63)/64; // parce qu'on utilise des long
+        printf("nbb=%d nb=%d\n",nbb,nb);
+        code=(unsigned long *)malloc(w*h*nb*sizeof(unsigned long));
+        for(int i=0;i<w*h*nb;i++) code[i]=0;
+
+        double t1=horloge();
+        int b;
+        unsigned long mask;
+        int nbk=0; // compte les codes
+        for(int i=0;i<n;i++) {
+            printf("i=%d\n",i);
+            unsigned char *pi=img[i].data;
+            for(int j=i+1;j<n;j++) {
+                unsigned char *pj=img[j].data;
+                b=nbk/64;
+                mask=1L<<(nbk%64);
+                for(int k=0;k<w*h;k++) {
+                    if( pmask[k]==0 ) continue;
+                    if( pi[k]>pj[k] || (pi[k]==pj[k] && (nbk&1)) ) code[k*nb+b]|=mask;
+                }
+                nbk++;
+            }
+        }
+        double t2=horloge();
+        printf("duree=%12.6f\n",t2-t1);
+        int j=900*w+1200;
+        printf("pixel %d (%d,%d) : ",j,j%w,j/w);
+        dumpCode(code+(j*nb));
+        printf("\n");
+    }
+
+    if( cam ) {
+        codeCam=code;
+    }else{
+        codeProj=code;
+    }
+
+    // test cost
+/*
+    int j1=900*w+1200;
+    int j2=900*w+1202;
+    int k=cost(code+j1*nb,code+j2*nb);
+*/
+
+}
+
+void leopard::prepareMatch() {
+	// les matchs
+	matchCam=(minfo *)malloc(wc*hc*sizeof(minfo));
+	matchProj=(minfo *)malloc(wp*hp*sizeof(minfo));
+
+	for(int i=0;i<wc*hc;i++) { matchCam[i].idx=0; matchCam[i].cost=nbb; }
+	for(int i=0;i<wp*hp;i++) { matchProj[i].idx=0; matchProj[i].cost=nbb; }
+}
+
+void leopard::forceBrute() {
+	int step=wc*hc/100;
+	for(int i=0;i<wc*hc;i++) {
+		if( i%step==0 ) printf("%d %%\n",i*100/wc/hc);
+		if( maskCam[i]==0 ) continue;
+		for(int j=0;j<wp*hp;j++) {
+			if( maskProj[j]==0 ) continue;
+			int c=cost(codeCam+i*nb,codeProj+j*nb);
+			if( c<matchCam[i].cost ) { matchCam[i].idx=j;matchCam[i].cost=c; }
+			if( c<matchProj[j].cost ) { matchProj[j].idx=i;matchProj[j].cost=c; }
+		}
+	}
+}
+
+
+int leopard::bitCount(unsigned long n)
+{
+    n = ((0xaaaaaaaaaaaaaaaaL & n) >>  1) + (0x5555555555555555L & n);
+    n = ((0xccccccccccccccccL & n) >>  2) + (0x3333333333333333L & n);
+    n = ((0xf0f0f0f0f0f0f0f0L & n) >>  4) + (0x0f0f0f0f0f0f0f0fL & n);
+    n = ((0xff00ff00ff00ff00L & n) >>  8) + (0x00ff00ff00ff00ffL & n);
+    n = ((0xffff0000ffff0000L & n) >> 16) + (0x0000ffff0000ffffL & n);
+    n = ((0xffffffff00000000L & n) >> 32) + (0x00000000ffffffffL & n);
+    return (int)n;
+}
+
+
+int leopard::cost(unsigned long *a,unsigned long *b) {
+    //printf("A: ");dumpCode(a);printf("\n");
+    //printf("B: ");dumpCode(b);printf("\n");
+	int c=0;
+	for(int i=0;i<nb;i++) c+=bitCount(a[i]^b[i]);
+	//printf("cost=%d\n",c);
+    return c;
+}
+
+void leopard::makeLUT(cv::Mat &lut,int cam) {
+	if( cam )	match2image(lut,matchCam,maskCam,wc,hc,wp,hp);
+	else		match2image(lut,matchProj,maskProj,wp,hp,wc,hc);
+}
+
+// output une image pour le match (imager w x h) vers une image ww x hh
+void leopard::match2image(cv::Mat &lut,minfo *match,unsigned char *mask,int w,int h,int ww,int hh) {
+    lut.create(h,w,CV_16UC3);
+    int x,y,xx,yy,cc;
+    int i=0;
+    for(y=0;y<h;y++) for(x=0;x<w;x++) {
+        i=y*w+x;
+        xx=match[i].idx%ww;
+        yy=match[i].idx/ww;
+        cc=match[i].cost;
+        //lut->at<Vec3s>(y,x)=Vec3s((xx*65535)/ww,(yy*65535)/hh,(cc*65535)/maxcost);
+        if( mask[i]==0 ) {
+            lut.at<Vec3s>(y,x)=Vec3s( 0, 0, 0);
+        }else{
+            lut.at<Vec3s>(y,x)=Vec3s( (cc*65535)/nbb, (yy*65535)/hh, (xx*65535)/ww);
+        }
+    }
+}
 
 
 #if 0
@@ -478,11 +735,28 @@ bool leopard::loop() {
 	return(true);
 }
 
+
+#if 0
+unsigned BitCount32(unsigned b)
+{
+    b = (b & 0x55555555) + (b >> 1 & 0x55555555);
+    b = (b & 0x33333333) + (b >> 2 & 0x33333333);
+    b = (b + (b >> 4)) & 0x0F0F0F0F;
+    b = b + (b >> 8);
+    b = (b + (b >> 16)) & 0x0000003F;
+    return b;
+}
+#endif
+
+
+
+#if 0
 int leopard::cost(unsigned char *a,unsigned char *b,int sz) {
 	int i,k=0;
 	for(i=0;i<sz;i++) k+=bitCount[a[i]^b[i]];
 	return(k);
 }
+#endif
 
 // output une image pour le match (imager w x h) vers une image ww x hh
 void leopard::match2image(blob *lut,minfo *match,int w,int h,int ww,int hh,int maxcost) {
@@ -642,11 +916,6 @@ typedef struct {
 	unsigned int vmask; // voting mask (nv bits)
 } bminfo;
 
-double horloge() {
-	struct timeval tv;
-	gettimeofday(&tv,NULL);
-	return((double)tv.tv_sec+tv.tv_usec/1000000.0);
-}
 
 
 unsigned char *gcodeA; // index >=0 : [i]
