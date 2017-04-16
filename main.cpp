@@ -29,23 +29,24 @@ void testLeopard() {
 
     leopard *L=new leopard();
     /// lire des images
-    int nb=64;
+    int nb=20;
     Mat *imagesCam;
     imagesCam=L->readImages((char *)"data/cam1/cam%03d.jpg",0,nb-1);
-    L->computeMask(1,imagesCam,nb,1.45,5.0,4,0,0);
-    L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
-    //L->computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
+    L->computeMask(1,imagesCam,nb,1.45,5.0,1,0,0);
+    //L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
+    L->computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
     delete[] imagesCam;
 
     Mat *imagesProj;
     imagesProj=L->readImages((char *)"data/proj1/leopard_2560_1080_32B_%03d.jpg",0,nb-1);
-    L->computeMask(0,imagesProj,nb,1.45,5.0,4,0,0);
-    //L->computeCodes(0,LEOPARD_QUADRATIC,imagesProj);
-    L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
+    L->computeMask(0,imagesProj,nb,1.45,5.0,1,0,0);
+    //L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
+    L->computeCodes(0,LEOPARD_QUADRATIC,imagesProj);
     delete[] imagesProj;
 
     L->prepareMatch();
-    L->forceBrute();
+    //L->forceBrute();
+    for(int i=0;i<30;i++) L->doLsh();
 
     cv::Mat lutCam;
     cv::Mat lutProj;

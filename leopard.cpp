@@ -16,6 +16,23 @@ using namespace cv;
 // difference min entre un max et un min pour un pixel "actif"
 //#define ACTIVE_DIFFERENCE	96
 
+unsigned char bt[65536];
+
+int bitCountOrig(unsigned long n) {
+    n = ((0xaaaaaaaaaaaaaaaaL & n) >>  1) + (0x5555555555555555L & n);
+    n = ((0xccccccccccccccccL & n) >>  2) + (0x3333333333333333L & n);
+    n = ((0xf0f0f0f0f0f0f0f0L & n) >>  4) + (0x0f0f0f0f0f0f0f0fL & n);
+    n = ((0xff00ff00ff00ff00L & n) >>  8) + (0x00ff00ff00ff00ffL & n);
+    n = ((0xffff0000ffff0000L & n) >> 16) + (0x0000ffff0000ffffL & n);
+    n = ((0xffffffff00000000L & n) >> 32) + (0x00000000ffffffffL & n);
+    return (int)n;
+}
+
+typedef struct {
+	unsigned int byte; // 0..nb-1 (c'est en fait un unsigned long, donc max bits = 255*64=16384 bits
+	unsigned long mask; // 1,2,4,8......1L<<63
+	unsigned int vmask; // voting mask (nv bits)
+} bminfo;
 
 leopard::leopard() {
     printf("leopard init!\n");
@@ -26,6 +43,11 @@ leopard::leopard() {
     codeProj=NULL;
 	matchCam=NULL;
 	matchProj=NULL;
+
+    vote=NULL;
+
+    for(int i=0;i<65536;i++) bt[i]=bitCountOrig(i);
+    //for(int i=0;i<65536;i++) printf("%3d : %3d\n",i,bt[i]);
 }
 
 leopard::~leopard() {
@@ -319,6 +341,7 @@ void leopard::computeCodes(int cam,int type,cv::Mat *img) {
         double t2=horloge();
         printf("duree=%12.6f\n",t2-t1);
         int j=900*w+1200;
+        while( pmask[j]==0 ) j++;
         printf("pixel %d (%d,%d) : ",j,j%w,j/w);
         dumpCode(code+(j*nb));
         printf("\n");
@@ -349,6 +372,7 @@ void leopard::prepareMatch() {
 }
 
 void leopard::forceBrute() {
+    double t1=horloge();
 	int step=wc*hc/100;
 	for(int i=0;i<wc*hc;i++) {
 		if( i%step==0 ) printf("%d %%\n",i*100/wc/hc);
@@ -360,26 +384,140 @@ void leopard::forceBrute() {
 			if( c<matchProj[j].cost ) { matchProj[j].idx=i;matchProj[j].cost=c; }
 		}
 	}
+    double t2=horloge();
+    printf("temps=%12.6f\n",t2-t1);
 }
 
+int leopard::doLsh() {
+    lsh(0,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp);
+    lsh(1,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp);
+    lsh(0,codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc);
+    lsh(1,codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc);
+    return 0;
+}
 
-int leopard::bitCount(unsigned long n)
-{
-    n = ((0xaaaaaaaaaaaaaaaaL & n) >>  1) + (0x5555555555555555L & n);
-    n = ((0xccccccccccccccccL & n) >>  2) + (0x3333333333333333L & n);
-    n = ((0xf0f0f0f0f0f0f0f0L & n) >>  4) + (0x0f0f0f0f0f0f0f0fL & n);
-    n = ((0xff00ff00ff00ff00L & n) >>  8) + (0x00ff00ff00ff00ffL & n);
-    n = ((0xffff0000ffff0000L & n) >> 16) + (0x0000ffff0000ffffL & n);
-    n = ((0xffffffff00000000L & n) >> 32) + (0x00000000ffffffffL & n);
+int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
+			      unsigned long *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb) {
+	int nv=20; // nb de bits pour le vote
+	int nbvote=(1<<nv);
+	bminfo bm[nv];
+	double now=horloge();
+
+	//log << "lsh " << nv << " bits, allocate "<< ((1<<nv)*sizeof(int)) << " bytes"<<warn;
+
+	if( vote==NULL) vote=(int *)malloc(nbvote*sizeof(int));
+    int *q=vote;
+	for(int i=0;i<nbvote;i++) *q++=-1; // pas de vote!
+
+    // choisir nv bits au hasard
+	// pas ideal... ca peut repeter des bits...
+	for(int i=0;i<nv;i++) {
+        int b=rand()%nbb; // the selected bit
+		bm[i].byte=b/64;
+		bm[i].mask=1L<<(b%64);
+		bm[i].vmask=1<<i;
+		//log << "bit " << i << " byte="<<(int)bm[i].byte<<", mask="<<(int)bm[i].mask<<", vmask="<<bm[i].vmask<<info;
+	}
+
+    unsigned long *p;
+
+	int start,stop,step;
+	if( dir ) { start=0;stop=wa*ha;step=1; }
+	else		{ start=wa*ha-1;stop=-1;step=-1; }
+
+	for(int i=start;i!=stop;i+=step) {
+			// si on est pas actif.... on saute!
+			if( maskA[i]==0 ) continue;
+			// ramasse le hashcode
+			p=codeA+i*nb;
+			unsigned int hash=0;
+			for(int k=0;k<nv;k++) {
+				if( p[bm[k].byte]&bm[k].mask ) hash|=bm[k].vmask;
+			}
+			// basic case... ecrase les autres votes
+			//vote[hash]=i;
+			// better option??? if there is already a vote, replace if we have a worse best match
+			if( vote[hash]<0 || matchA[i].cost>matchA[vote[hash]].cost ) vote[hash]=i;
+	}
+
+	// stats
+	int holes=0;
+	for(int i=0;i<nbvote;i++) if( vote[i]<0 ) holes++;
+	//printf("espace dans les votes = %d%%\n",(holes*100/nbvote));
+
+	// B match
+    int redox=0;
+	for(int i=0;i<wb*hb;i++) {
+			// si on est pas actif.... on saute!
+			if( maskB[i]==0 ) continue;
+			// ramasse le hashcode
+			p=codeB+i*nb;
+			unsigned int hash=0;
+			for(int k=0;k<nv;k++) {
+				if( p[bm[k].byte]&bm[k].mask ) hash|=bm[k].vmask;
+			}
+			// basic
+			int j=vote[hash];
+			if( j<0 ) continue; // aucun vote!
+
+			// match!
+			int c=cost(codeA+j*nb,codeB+i*nb);
+			if( c<matchA[j].cost ) { redox+=matchA[j].cost-c;matchA[j].idx=i;matchA[j].cost=c; }
+			if( c<matchB[i].cost ) { redox+=matchB[i].cost-c;matchB[i].idx=j;matchB[i].cost=c; }
+	}
+	// somme des couts
+	int delta=0;
+	for(int i=0;i<wa*ha;i++) delta+=matchA[i].cost;
+	for(int i=0;i<wb*hb;i++) delta+=matchB[i].cost;
+
+	now=horloge()-now;
+    printf("time=%12.6f  redox=%10d\n",now,redox);
+	return(redox);
+}
+
+int leopard::bitCount(unsigned long n) {
+    n = (0x5555555555555555L & (n>>1))  + (0x5555555555555555L & n);
+    n = (0x3333333333333333L & (n>>2))  + (0x3333333333333333L & n);
+    // a partir de 4, plus de probleme de carry bit parce que 4 utilise 3 bits, donc le 4e est toujours 0
+    n = (0x0f0f0f0f0f0f0f0fL & ((n>>4)+n));
+    n = (0x00ff00ff00ff00ffL & ((n>>8)+n));
+    n = (0x0000ffff0000ffffL & ((n>>16)+n));
+    n = (0x00000000ffffffffL & ((n>>32)+n));
     return (int)n;
 }
+
+/*
+int leopard::bitCount(unsigned long n) {
+    int c;
+    for(c=0;n;c++) n&=n-1;
+    return(c);
+}
+*/
+
+/*
+int leopard::bitCount(unsigned long n) {
+    //register unsigned char *p=(unsigned char *)&n;
+    //return bt[*p++] + bt[*p++] + bt[*p++] + bt[*p++]
+    //     + bt[*p++] + bt[*p++] + bt[*p++] + bt[*p];
+    unsigned short *p=(unsigned short *)&n;
+    return bt[*p++] + bt[*p++] + bt[*p++] + bt[*p];
+}
+*/
+
+// genere n bits dans un unsigned long
+/*
+unsigned long leopard::bitGen(int n)
+{
+    unsigned long mask=1L;
+}
+*/
 
 
 int leopard::cost(unsigned long *a,unsigned long *b) {
     //printf("A: ");dumpCode(a);printf("\n");
     //printf("B: ");dumpCode(b);printf("\n");
 	int c=0;
-	for(int i=0;i<nb;i++) c+=bitCount(a[i]^b[i]);
+	for(int i=0;i<nb;i++) c+=bitCount(*a++^*b++);
 	//printf("cost=%d\n",c);
     return c;
 }
@@ -672,8 +810,7 @@ bool leopard::loop() {
 		log << "delta proj = "<<delta<<info;
 
 		profilometre_start("heuristique");
-		delta=heuristique(codeCam,matchCam,wc,hc,
-					  codeProj,matchProj,wp,hp);
+		delta=heuristique(codeCam,matchCam,wc,hc,codeProj,matchProj,wp,hp);
 		profilometre_stop("heuristique");
 		log << "delta heu = "<<delta<<info;
 
@@ -911,9 +1048,9 @@ void leopard::forceBrute() {
 }
 
 typedef struct {
-	unsigned char byte; // 0..nb-1
-	unsigned char mask; // 1,2,4,8..128
-	unsigned int vmask; // voting mask (nv bits)
+	unsigned int byte; // 0..nb-1 (c'est en fait un unsigned long, donc max bits = 255*64=16384 bits
+	unsigned long mask; // 1,2,4,8......1L<<63
+	unsigned long vmask; // voting mask (nv bits)
 } bminfo;
 
 
