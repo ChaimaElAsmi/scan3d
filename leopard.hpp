@@ -70,16 +70,20 @@ class leopard {
 	void forceBrute();
     void makeLUT(cv::Mat &lut,int cam);
     int doLsh();
+    int doHeuristique();
 
 
   private:
     void dumpCode(unsigned long *c);
+    void dumpCodeNum(unsigned long *c);
     double horloge();
 	int cost(unsigned long *a,unsigned long *b);
     int bitCount(unsigned long n);
 	void match2image(cv::Mat &lut,minfo *match,unsigned char *mask,int w,int h,int ww,int hh);
 
 	int lsh( int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
+					 unsigned long *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb);
+	int heuristique( unsigned long *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
 					 unsigned long *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb);
 
 	//unsigned char bitCount[256]; // precomputed bit count

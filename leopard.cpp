@@ -242,6 +242,13 @@ void leopard::dumpCode(unsigned long *c) {
     printf(" [%d/%d] ",nbb-one,one);
 }
 
+void leopard::dumpCodeNum(unsigned long *c) {
+	for(int b=0;b<nb;b++) {
+        printf("%lu ",c[b]);
+    }
+    printf("\n");
+}
+
 
 void leopard::computeCodes(int cam,int type,cv::Mat *img) {
     printf("-- compute codes cam=%d type=%d n=%d --\n",cam,type,n);
@@ -345,6 +352,13 @@ void leopard::computeCodes(int cam,int type,cv::Mat *img) {
         printf("pixel %d (%d,%d) : ",j,j%w,j/w);
         dumpCode(code+(j*nb));
         printf("\n");
+
+        /*
+        for(int i=0;i<w*h;i++) {
+            if( pmask[i]==0 ) continue;
+            dumpCodeNum(code+(i*nb));
+        }
+        */
     }
 
     if( cam ) {
@@ -367,6 +381,7 @@ void leopard::prepareMatch() {
 	matchCam=(minfo *)malloc(wc*hc*sizeof(minfo));
 	matchProj=(minfo *)malloc(wp*hp*sizeof(minfo));
 
+    // initialise avec le cout le plus eleve pour avoir un match valide mais si inactif
 	for(int i=0;i<wc*hc;i++) { matchCam[i].idx=0; matchCam[i].cost=nbb; }
 	for(int i=0;i<wp*hp;i++) { matchProj[i].idx=0; matchProj[i].cost=nbb; }
 }
@@ -389,10 +404,18 @@ void leopard::forceBrute() {
 }
 
 int leopard::doLsh() {
+    // de cam vers proj, dans les deux directions
     lsh(0,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp);
     lsh(1,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp);
+    // de proj vers cam, dans les deux directions
     lsh(0,codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc);
     lsh(1,codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc);
+    return 0;
+}
+
+int leopard::doHeuristique() {
+    heuristique(codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp);
+    heuristique(codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc);
     return 0;
 }
 
@@ -425,6 +448,8 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
 	if( dir ) { start=0;stop=wa*ha;step=1; }
 	else		{ start=wa*ha-1;stop=-1;step=-1; }
 
+    int collision=0;
+    int count=0;
 	for(int i=start;i!=stop;i+=step) {
 			// si on est pas actif.... on saute!
 			if( maskA[i]==0 ) continue;
@@ -434,10 +459,20 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
 			for(int k=0;k<nv;k++) {
 				if( p[bm[k].byte]&bm[k].mask ) hash|=bm[k].vmask;
 			}
+            if( vote[hash]>=0 ) collision++;
+            count++;
 			// basic case... ecrase les autres votes
 			//vote[hash]=i;
 			// better option??? if there is already a vote, replace if we have a worse best match
 			if( vote[hash]<0 || matchA[i].cost>matchA[vote[hash]].cost ) vote[hash]=i;
+#if 0
+            else{
+                for(int g=1;g<10;g++) {
+                    if( hash>=(unsigned int)g && vote[hash-g]<0 ) { vote[hash-g]=i;break; }
+                    else if( hash<(unsigned int)(nbvote-g) && vote[hash+g]<0 ) { vote[hash+g]=i;break; }
+                }
+            }
+#endif
 	}
 
 	// stats
@@ -464,16 +499,86 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
 			int c=cost(codeA+j*nb,codeB+i*nb);
 			if( c<matchA[j].cost ) { redox+=matchA[j].cost-c;matchA[j].idx=i;matchA[j].cost=c; }
 			if( c<matchB[i].cost ) { redox+=matchB[i].cost-c;matchB[i].idx=j;matchB[i].cost=c; }
+
+#if 0
+            // extra search
+            for(int g=1;g<10;g++) {
+                if( hash>=(unsigned int)g ) {
+                    j=vote[hash-g];
+                    if( j<0 ) continue;
+                    int c=cost(codeA+j*nb,codeB+i*nb);
+                    if( c<matchA[j].cost ) { redox+=matchA[j].cost-c;matchA[j].idx=i;matchA[j].cost=c; }
+                    if( c<matchB[i].cost ) { redox+=matchB[i].cost-c;matchB[i].idx=j;matchB[i].cost=c; }
+                }
+                if( hash<=(unsigned char)(nbvote-g) ) {
+                    j=vote[hash+g];
+                    if( j<0 ) continue; // aucun vote!
+                    int c=cost(codeA+j*nb,codeB+i*nb);
+                    if( c<matchA[j].cost ) { redox+=matchA[j].cost-c;matchA[j].idx=i;matchA[j].cost=c; }
+                    if( c<matchB[i].cost ) { redox+=matchB[i].cost-c;matchB[i].idx=j;matchB[i].cost=c; }
+                }
+            }
+#endif
 	}
+	now=horloge()-now;
+
 	// somme des couts
 	int delta=0;
 	for(int i=0;i<wa*ha;i++) delta+=matchA[i].cost;
 	for(int i=0;i<wb*hb;i++) delta+=matchB[i].cost;
 
-	now=horloge()-now;
-    printf("time=%12.6f  redox=%10d\n",now,redox);
+    printf("time=%12.6f  redox=%10d  vide=%3d%% collisions=%3d%% (%d,%d)\n",now,redox,holes/(nbvote/100),collision/(count/100),nbvote,count);
 	return(redox);
 }
+
+
+
+int leopard::heuristique(unsigned long *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
+						 unsigned long *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb) {
+	// pour chaque cam[i] -> proj[j]
+	// on regarde si on pourrait ameliorer le match vers proj[autour de j]
+	// on regarde si on pourrait creer un match cam[autour de i] vers proj[j]
+	int di[8]={-1,1,-wa,wa,-1-wa,-1+wa,1-wa,1+wa};
+	int dj[8]={-1,1,-wb,wb,-1-wb,-1+wb,1-wb,1+wb};
+	double now=horloge();
+
+	int i,j,k;
+	for(i=0;i<wa*ha;i++) {
+		// skip si pas actif!
+		if( maskA[i]==0 ) continue;
+
+		j=matchA[i].idx;
+		// regarde autour de j
+		for(k=0;k<8;k++) {
+			int jj=j+dj[k];
+			if( jj<0 || jj>=wb*hb ) continue;
+			int c=cost(codeA+i*nb,codeB+jj*nb);
+			if( c<matchA[i].cost ) { matchA[i].idx=jj;matchA[i].cost=c; }
+			if( c<matchB[jj].cost ) { matchB[jj].idx=i;matchB[jj].cost=c; }
+		}
+		// regarde autour de i
+		for(k=0;k<8;k++) {
+			int ii=i+di[k];
+			if( ii<0 || ii>=wa*ha ) continue;
+			int c=cost(codeA+ii*nb,codeB+j*nb);
+			if( c<matchA[ii].cost ) { matchA[ii].idx=j;matchA[ii].cost=c; }
+			if( c<matchB[j].cost ) { matchB[j].idx=ii;matchB[j].cost=c; }
+		}
+		
+	}
+	now=horloge()-now;
+    printf("time = %12.6f\n",now);
+	// somme des couts
+    /*
+	int delta=0;
+	for(int i=0;i<wa*ha;i++) delta+=matchA[i].cost;
+	for(int i=0;i<wb*hb;i++) delta+=matchB[i].cost;
+    return(delta);
+    */
+	return(0);
+}
+
+
 
 int leopard::bitCount(unsigned long n) {
     n = (0x5555555555555555L & (n>>1))  + (0x5555555555555555L & n);
@@ -1110,80 +1215,6 @@ int leopard::sort(unsigned char *codeA,minfo *matchA,int wa,int ha,
 }
 
 
-
-int leopard::lsh(int dir,unsigned char *codeA,minfo *matchA,int wa,int ha,
-			      unsigned char *codeB,minfo *matchB,int wb,int hb) {
-	int nv=20; // nb de bits pour le vote
-	int nbvote=(1<<nv);
-	bminfo bm[nv];
-	double now=horloge();
-
-	//log << "lsh " << nv << " bits, allocate "<< ((1<<nv)*sizeof(int)) << " bytes"<<warn;
-
-	if( vote==NULL) vote=(int *)malloc(nbvote*sizeof(int));
-	for(int i=0;i<nbvote;i++) vote[i]=-1;
-
-	// pas ideal... ca peut repeter des bits...
-	for(int i=0;i<nv;i++) {
-		bm[i].byte=rand()%nb;
-		bm[i].mask=1<<(rand()%8);
-		bm[i].vmask=1<<i;
-		//log << "bit " << i << " byte="<<(int)bm[i].byte<<", mask="<<(int)bm[i].mask<<", vmask="<<bm[i].vmask<<info;
-	}
-
-	// A vote
-	unsigned char *p;
-	int start,stop,step;
-	if( dir ) { start=0;stop=wa*ha;step=1; }
-	else		{ start=wa*ha-1;stop=-1;step=-1; }
-	for(int i=start;i!=stop;i+=step) {
-			// si on est pas actif.... on saute!
-			if( matchA[i].active==0 ) continue;
-			// ramasse le hashcode
-			p=codeA+i*nb;
-			unsigned int hash=0;
-			for(int k=0;k<nv;k++) {
-				if( p[bm[k].byte]&bm[k].mask ) hash|=bm[k].vmask;
-			}
-			// basic case... ecrase les autres votes
-			//vote[hash]=i;
-			// better option??? if there is already a vote, replace if we have a worse best match
-			if( vote[hash]<0 || matchA[i].cost>matchA[vote[hash]].cost ) vote[hash]=i;
-	}
-
-	// stats
-	int holes=0;
-	for(int i=0;i<nbvote;i++) if( vote[i]<0 ) holes++;
-	log << "holes = "<<(holes*100/nbvote)<<"%"<<warn;
-
-	// B match
-	for(int i=0;i<wb*hb;i++) {
-			// si on est pas actif.... on saute!
-			if( matchB[i].active==0 ) continue;
-			// ramasse le hashcode
-			p=codeB+i*nb;
-			unsigned int hash=0;
-			for(int k=0;k<nv;k++) {
-				if( p[bm[k].byte]&bm[k].mask ) hash|=bm[k].vmask;
-			}
-			// basic
-			int j=vote[hash];
-			if( j<0 ) continue;
-
-			// match!
-			int c=cost(codeA+j*nb,codeB+i*nb,nb);
-			if( c<matchA[j].cost ) { matchA[j].idx=i;matchA[j].cost=c; }
-			if( c<matchB[i].cost ) { matchB[i].idx=j;matchB[i].cost=c; }
-	}
-	// somme des couts
-	int delta=0;
-	for(int i=0;i<wa*ha;i++) delta+=matchA[i].cost;
-	for(int i=0;i<wb*hb;i++) delta+=matchB[i].cost;
-
-	now=horloge()-now;
-	log << "time is "<<now<<warn;
-	return(delta);
-}
 
 int leopard::heuristique( unsigned char *codeA,minfo *matchA,int wa,int ha,
 						 unsigned char *codeB,minfo *matchB,int wb,int hb) {

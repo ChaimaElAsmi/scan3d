@@ -46,13 +46,15 @@ void testLeopard() {
 
     L->prepareMatch();
     //L->forceBrute();
-    for(int i=0;i<30;i++) L->doLsh();
+    for(int i=0;i<40;i++) {
+        L->doLsh();
+        L->doHeuristique();
+    }
 
     cv::Mat lutCam;
     cv::Mat lutProj;
     L->makeLUT(lutCam,1);
     L->makeLUT(lutProj,0);
-
     imwrite("lutcam.png",lutCam);
     imwrite("lutproj.png",lutProj);
 
