@@ -194,7 +194,8 @@ void leopard::computeMask(int cam,cv::Mat *img,int nb,double seuil,double bias,i
         double mH=psumH[j]/cH;
         double stdL=(int)sqrt((double)psum2L[j]/pcountL[j]-(double)mL*mL);
         double stdH=(int)sqrt((double)psum2H[j]/pcountH[j]-(double)mH*mH);
-        double v=(mH-mL)/((stdL+stdH)/2+bias); // le +5 est pour limiter l'effet lorsque mH-mL -> 0
+
+        double v=(mH-mL)/(2*sqrt(stdL+stdH)+bias); // le +5 est pour limiter l'effet lorsque mH-mL -> 0
         pbimod[j]=v*20;
         pmask[j]=(v>=seuil)?255:0;
     }
@@ -347,7 +348,8 @@ void leopard::computeCodes(int cam,int type,cv::Mat *img) {
         }
         double t2=horloge();
         printf("duree=%12.6f\n",t2-t1);
-        int j=900*w+1200;
+        //int j=900*w+1200;
+        int j = 200 * w + 300;
         while( pmask[j]==0 ) j++;
         printf("pixel %d (%d,%d) : ",j,j%w,j/w);
         dumpCode(code+(j*nb));
@@ -435,10 +437,10 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
     // choisir nv bits au hasard
 	// pas ideal... ca peut repeter des bits...
 	for(int i=0;i<nv;i++) {
-        int b=rand()%nbb; // the selected bit
-		bm[i].byte=b/64;
-		bm[i].mask=1L<<(b%64);
-		bm[i].vmask=1<<i;
+            int b=rand()%nbb; // the selected bit
+            bm[i].byte=b/64;
+            bm[i].mask=1L<<(b%64);
+            bm[i].vmask=1<<i;
 		//log << "bit " << i << " byte="<<(int)bm[i].byte<<", mask="<<(int)bm[i].mask<<", vmask="<<bm[i].vmask<<info;
 	}
 
@@ -457,7 +459,7 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
 			p=codeA+i*nb;
 			unsigned int hash=0;
 			for(int k=0;k<nv;k++) {
-				if( p[bm[k].byte]&bm[k].mask ) hash|=bm[k].vmask;
+                                if( p[bm[k].byte] & bm[k].mask ) hash|=bm[k].vmask;
 			}
             if( vote[hash]>=0 ) collision++;
             count++;
