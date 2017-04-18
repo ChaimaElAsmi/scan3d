@@ -195,7 +195,10 @@ void leopard::computeMask(int cam,cv::Mat *img,int nb,double seuil,double bias,i
         double stdL=(int)sqrt((double)psum2L[j]/pcountL[j]-(double)mL*mL);
         double stdH=(int)sqrt((double)psum2H[j]/pcountH[j]-(double)mH*mH);
 
+        // blub
         double v=(mH-mL)/(2*sqrt(stdL+stdH)+bias); // le +5 est pour limiter l'effet lorsque mH-mL -> 0
+
+
         pbimod[j]=v*20;
         pmask[j]=(v>=seuil)?255:0;
     }
