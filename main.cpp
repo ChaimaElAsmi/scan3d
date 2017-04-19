@@ -18,7 +18,7 @@ double horloge() {
 
 
 void testLeopardSeb() {
-    printf("----- test leopard -----\n");
+    printf("----- test leopard seb -----\n");
 
 
     printf("sizeof char %d\n",(int)sizeof(char));
@@ -70,7 +70,7 @@ void testLeopardSeb() {
 
 
 void testLeopardChaima() {
-    printf("----- test leopard -----\n");
+    printf("----- test leopard chaima -----\n");
 
 
     printf("sizeof char %d\n",(int)sizeof(char));
@@ -126,6 +126,8 @@ int main(int argc, char *argv[]) {
     int nbImages = 100;
     Mat img[nbImages];
 
+    char *user=getenv("USER");
+    printf("Usager %s\n",user);
 
     // options
     for(int i=1;i<argc;i++) {
@@ -136,9 +138,13 @@ int main(int argc, char *argv[]) {
     }
 
 
+    if( strcmp(user,"roys")==0 ) {
+        testLeopardSeb();
+    }else if( strcmp(user,"chaima")==0 ) {
+        testLeopardChaima();
+    }
 
-    testLeopardSeb();
-    //testLeopardChaima();
+
     exit(0);
 
     VideoCapture cap(1);
