@@ -17,7 +17,59 @@ double horloge() {
 }
 
 
-void testLeopard() {
+void testLeopardSeb() {
+    printf("----- test leopard -----\n");
+
+
+    printf("sizeof char %d\n",(int)sizeof(char));
+    printf("sizeof short %d\n",(int)sizeof(short));
+    printf("sizeof int %d\n",(int)sizeof(int));
+    printf("sizeof long %d\n",(int)sizeof(long));
+    printf("sizeof long long %d\n",(int)sizeof(long long));
+
+    leopard *L=new leopard();
+    /// lire des images
+    int nb=20;
+    Mat *imagesCam;
+    imagesCam=L->readImages((char *)"data/cam1/cam%03d.jpg",0,nb-1);
+    L->computeMask(1,imagesCam,nb,1.45,5.0,1,0,0);
+    //L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
+    L->computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
+    delete[] imagesCam;
+
+    Mat *imagesProj;
+    imagesProj=L->readImages((char *)"data/proj1/leopard_2560_1080_32B_%03d.jpg",0,nb-1);
+    L->computeMask(0,imagesProj,nb,1.45,5.0,1,0,0);
+    //L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
+    L->computeCodes(0,LEOPARD_QUADRATIC,imagesProj);
+    delete[] imagesProj;
+
+    L->prepareMatch();
+    //L->forceBrute();
+    for(int i=0;i<40;i++) {
+        L->doLsh();
+        L->doHeuristique();
+    }
+
+    cv::Mat lutCam;
+    cv::Mat lutProj;
+    L->makeLUT(lutCam,1);
+    L->makeLUT(lutProj,0);
+
+    imwrite("lutcam.png",lutCam);
+    imwrite("lutproj.png",lutProj);
+
+
+    printf("test\n");
+    delete L;
+    printf("----- done -----\n");
+}
+
+
+
+
+
+void testLeopardChaima() {
     printf("----- test leopard -----\n");
 
 
@@ -69,7 +121,6 @@ void testLeopard() {
 
 
 
-
 int main(int argc, char *argv[]) {
 
     int nbImages = 100;
@@ -86,7 +137,8 @@ int main(int argc, char *argv[]) {
 
 
 
-    testLeopard();
+    testLeopardSeb();
+    //testLeopardChaima();
     exit(0);
 
     VideoCapture cap(1);
