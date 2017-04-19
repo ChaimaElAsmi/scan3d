@@ -29,34 +29,36 @@ void testLeopard() {
 
     leopard *L=new leopard();
     /// lire des images
-    int nb=20;
+    int nb=30;
+    int from=25;
     Mat *imagesCam;
-    imagesCam=L->readImages((char *)"data/cam1/cam%03d.jpg",0,nb-1);
-    L->computeMask(1,imagesCam,nb,1.45,5.0,1,0,0);
+    imagesCam=L->readImages((char *)"data/cam2/cam_%03d.jpg",from,from+nb-1);
+    //seuil = 1.45
+    L->computeMask(1,imagesCam,nb,1,5.0,1,0,0);
     //L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
     L->computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
     delete[] imagesCam;
 
     Mat *imagesProj;
-    imagesProj=L->readImages((char *)"data/proj1/leopard_2560_1080_32B_%03d.jpg",0,nb-1);
-    L->computeMask(0,imagesProj,nb,1.45,5.0,1,0,0);
+    //proj2/leopard_1280_720_%03d
+    //proj1/leopard_2560_1080_32B_
+    imagesProj=L->readImages((char *)"data/proj2/leopard_1280_720_%03d.jpg",0,nb-1);
+    L->computeMask(0,imagesProj,nb,1,5.0,1,0,0);
     //L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
     L->computeCodes(0,LEOPARD_QUADRATIC,imagesProj);
     delete[] imagesProj;
 
     L->prepareMatch();
     //L->forceBrute();
-    for(int i=0;i<40;i++) {
-        L->doLsh();
-        L->doHeuristique();
-    }
+    for(int i=0;i<30;i++) L->doLsh();
 
     cv::Mat lutCam;
     cv::Mat lutProj;
     L->makeLUT(lutCam,1);
     L->makeLUT(lutProj,0);
-    imwrite("lutcam.png",lutCam);
-    imwrite("lutproj.png",lutProj);
+
+    imwrite("lsh/lut2/lutcam.png",lutCam);
+    imwrite("lsh/lut2/lutproj.png",lutProj);
 
 
     printf("test\n");
