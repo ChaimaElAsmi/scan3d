@@ -33,20 +33,20 @@ void testLeopardSeb() {
     Mat *imagesCam;
     imagesCam=L->readImages((char *)"data/cam1/cam%03d.jpg",0,nb-1);
     L->computeMask(1,imagesCam,nb,1.45,5.0,1,0,0);
-    //L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
-    L->computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
+    L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
+    //L->computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
     delete[] imagesCam;
 
     Mat *imagesProj;
     imagesProj=L->readImages((char *)"data/proj1/leopard_2560_1080_32B_%03d.jpg",0,nb-1);
     L->computeMask(0,imagesProj,nb,1.45,5.0,1,0,0);
-    //L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
-    L->computeCodes(0,LEOPARD_QUADRATIC,imagesProj);
+    L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
+    //L->computeCodes(0,LEOPARD_QUADRATIC,imagesProj);
     delete[] imagesProj;
 
     L->prepareMatch();
     //L->forceBrute();
-    for(int i=0;i<40;i++) {
+    for(int i=0;i<100;i++) {
         L->doLsh();
         L->doHeuristique();
     }
