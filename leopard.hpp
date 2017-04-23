@@ -72,6 +72,8 @@ class leopard {
     int doLsh();
     int doHeuristique();
 
+    void statsCodes(int cam);
+
 
   private:
     void dumpCode(unsigned long *c);

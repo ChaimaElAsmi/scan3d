@@ -381,6 +381,72 @@ void leopard::computeCodes(int cam,int type,cv::Mat *img) {
 
 }
 
+
+// cam:1=yes,0=no
+void leopard::statsCodes(int cam) {
+
+    int w,h;
+    unsigned char *mask;
+    unsigned long *code;
+
+    if( cam ) {
+        w=wc;h=hc;mask=maskCam;code=codeCam;
+    }else{
+        w=wp;h=hp;mask=maskProj;code=codeProj;
+    }
+
+    printf("--- code stats ---\n");
+    int maxDist=50;
+    int maxL=maxDist*maxDist*2;
+    int *hh,*c; // [maxL], sum des couts, compte
+    hh=(int *)malloc(maxDist*maxL*sizeof(int)); // [distance^2]
+    c=(int *)malloc(maxDist*maxL*sizeof(int)); // [distance^2]
+
+    for(int i=0;i<maxL;i++) hh[i]=c[i]=0;
+    hh[0]=0;
+    c[0]=1;
+
+    // on compare les codes de pixels voisins
+    // on garde h[dist2] 0 1 2 3 4 5 .. MAXD2 pour la difference
+    // et c[dist2] pour le compte
+    for(int i=0;i<1000000;) {
+        if( i%10000==0 ) printf("%d\n",i);
+        int x=rand()%w;
+        int y=rand()%h;
+        if( mask[y*w+x]==0 ) { /*printf("Mx (%d,%d)\n",x,y);*/continue; }
+        double r=drand48()*maxDist;
+        double theta=drand48()*2.0*M_PI;
+        int dx=(int)(cos(theta)*r+0.5);
+        int dy=(int)(sin(theta)*r+0.5);
+        /*
+        int dx=rand()%(2*maxDist+1)-maxDist;
+        int dy=rand()%(2*maxDist+1)-maxDist;
+        */
+        int xx=x+dx;
+        int yy=y+dy;
+        if( xx<0 || xx>=w || yy<0 || yy>=h ) { /*printf("out\n");*/continue; }
+        if( mask[yy*w+xx]==0 ) { /*printf("Mxx\n");*/continue; }
+        int L=dx*dx+dy*dy;
+        int k=cost(code+(y*w+x)*nb,code+(yy*w+xx)*nb);
+        hh[L]+=k;
+        c[L]+=1;
+        i++;
+    }
+    char buf[100];
+    sprintf(buf,"stat%s.txt",cam?"cam":"proj");
+    FILE *f=fopen(buf,"w");
+    for(int i=0;i<maxL;i++) {
+        double d=sqrt((double)i);
+        double m=hh[i];
+        if( c[i]==0 ) m=-1.0; else {
+            m=hh[i]/(double)c[i];
+            fprintf(f,"%12.6f   %12.6f %d\n",d,m,c[i]);
+        }
+    }
+    fclose(f);
+}
+
+
 void leopard::prepareMatch() {
 	// les matchs
 	matchCam=(minfo *)malloc(wc*hc*sizeof(minfo));

@@ -29,26 +29,30 @@ void testLeopardSeb() {
 
     leopard *L=new leopard();
     /// lire des images
-    int nb=20;
+    int nb=40;
     Mat *imagesCam;
     imagesCam=L->readImages((char *)"data/cam1/cam%03d.jpg",0,nb-1);
     L->computeMask(1,imagesCam,nb,1.45,5.0,1,0,0);
-    L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
-    //L->computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
+    //L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
+    L->computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
     delete[] imagesCam;
 
     Mat *imagesProj;
     imagesProj=L->readImages((char *)"data/proj1/leopard_2560_1080_32B_%03d.jpg",0,nb-1);
     L->computeMask(0,imagesProj,nb,1.45,5.0,1,0,0);
-    L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
-    //L->computeCodes(0,LEOPARD_QUADRATIC,imagesProj);
+    //L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
+    L->computeCodes(0,LEOPARD_QUADRATIC,imagesProj);
     delete[] imagesProj;
+
+    // quelques stats
+    L->statsCodes(1);
+    L->statsCodes(0);
 
     L->prepareMatch();
     //L->forceBrute();
-    for(int i=0;i<100;i++) {
+    for(int i=0;i<20;i++) {
         L->doLsh();
-        L->doHeuristique();
+        //L->doHeuristique();
     }
 
     cv::Mat lutCam;
