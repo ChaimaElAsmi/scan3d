@@ -388,7 +388,6 @@ void leopard::computeCodes(int cam,int type,cv::Mat *img) {
 }
 
 
-<<<<<<< HEAD
 // cam:1=yes,0=no
 void leopard::statsCodes(int cam) {
 
@@ -453,9 +452,6 @@ void leopard::statsCodes(int cam) {
     fclose(f);
 }
 
-
-=======
->>>>>>> chaima
 void leopard::prepareMatch() {
 	// les matchs
     if(matchCam==NULL) 	matchCam=(minfo *)malloc(wc*hc*sizeof(minfo));
