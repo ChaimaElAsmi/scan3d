@@ -63,7 +63,7 @@ class leopard {
 	leopard(); //int w,int h, int nb, int freq, bool blur,string pid);
 	~leopard();
 
-    cv::Mat *readImages(char *name,int from,int to);
+    cv::Mat *readImages(char *name,int from,int to, int decal);
     void computeMask(int cam,cv::Mat *img,int nb,double seuil,double bias,int step,int offx,int offy);
     void computeCodes(int cam,int type,cv::Mat *img);
     void prepareMatch();
@@ -71,6 +71,7 @@ class leopard {
     void makeLUT(cv::Mat &lut,int cam);
     int doLsh();
     int doHeuristique();
+    void doShiftCodes();
 
     void statsCodes(int cam);
 
@@ -87,6 +88,8 @@ class leopard {
 					 unsigned long *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb);
 	int heuristique( unsigned long *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
 					 unsigned long *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb);
+
+        void shiftCodes(int shift, unsigned long *codes, int w, int h);
 
 	//unsigned char bitCount[256]; // precomputed bit count
 
