@@ -73,7 +73,6 @@ void testLeopardSeb() {
 
 
 //horiz = decal en x ou y // horiz = 1 -> x ; horiz = 0 -> y
-//dir = direction vers la ggauche ou droite // dir = 1 -> droite ; dir = 0 -> gauche
 Mat* souspixelsImage(Mat* source, int n, float f,int horiz) {
     Mat* dest=new Mat[n];
 
