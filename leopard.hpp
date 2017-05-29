@@ -71,8 +71,8 @@ class leopard {
     void makeLUT(cv::Mat &lut,int cam);
     int doLsh();
     int doHeuristique();
-    void doShiftCodes();
-
+    int doShiftCodes();
+    int sumCost();
     void statsCodes(int cam);
 
 

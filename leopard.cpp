@@ -234,7 +234,10 @@ void leopard::computeMask(int cam,cv::Mat *img,int nb,double seuil,double bias,i
     imwrite("min.png",min);
     imwrite("max.png",max);
     */
-    imwrite("mask.png",mask);
+    if (cam)
+        imwrite("maskCam.png",mask);
+    else
+        imwrite("maskProj.png", mask);
 }
 
 
@@ -321,7 +324,7 @@ void leopard::computeCodes(int cam,int type,cv::Mat *img) {
 //                dumpCode(code + j * nb);
 //                printf("\n");printf("\n");}
             }
-            if( (j%w)==1200 && (j/w)==900 ) {
+            if( (j%w)==200 && (j/w)==300 ) {
                 printf("pixel (%d,%d) : ",j%w,j/w);
                 dumpCode(code+(j*nb));
                 printf("\n");
@@ -342,9 +345,10 @@ void leopard::computeCodes(int cam,int type,cv::Mat *img) {
         int nbk=0; // compte les codes
         for(int i=0;i<n;i++) {
             printf("i=%d\n",i);
-            unsigned char *pi=img[i].data; prepareMatch();
+            unsigned char *pi=img[i].data;
 
             for(int j=i+1;j<n;j++) {
+                //printf("j=%d\n",j);
                 unsigned char *pj=img[j].data;
                 b=nbk/64;
                 mask=1L<<(nbk%64);
@@ -454,12 +458,12 @@ void leopard::statsCodes(int cam) {
 
 void leopard::prepareMatch() {
 	// les matchs
-    if(matchCam==NULL) 	matchCam=(minfo *)malloc(wc*hc*sizeof(minfo));
+    if(matchCam==NULL) matchCam=(minfo *)malloc(wc*hc*sizeof(minfo));
     if(matchProj==NULL) matchProj=(minfo *)malloc(wp*hp*sizeof(minfo));
 
     // initialise avec le cout le plus eleve pour avoir un match valide mais si inactif
-	for(int i=0;i<wc*hc;i++) { matchCam[i].idx=0; matchCam[i].cost=nbb; }
-	for(int i=0;i<wp*hp;i++) { matchProj[i].idx=0; matchProj[i].cost=nbb; }
+    for(int i=0;i<wc*hc;i++) { matchCam[i].idx=0; matchCam[i].cost=9999; }
+    for(int i=0;i<wp*hp;i++) { matchProj[i].idx=0; matchProj[i].cost=9999; }
 }
 
 void leopard::forceBrute() {
@@ -542,7 +546,7 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
             count++;
 			// basic case... ecrase les autres votes
 			//vote[hash]=i;
-			// better option??? if there is already a vote, replace if we have a worse best match
+            // better option??? if there is already a vote, replace if we have a worse best match
 			if( vote[hash]<0 || matchA[i].cost>matchA[vote[hash]].cost ) vote[hash]=i;
 #if 0
             else{
@@ -554,7 +558,7 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
 #endif
 	}
 
-    // stats>hiftCodes();
+    // stats
 	int holes=0;
 	for(int i=0;i<nbvote;i++) if( vote[i]<0 ) holes++;
 	//printf("espace dans les votes = %d%%\n",(holes*100/nbvote));
@@ -606,7 +610,8 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
 	// somme des couts
     int delta=0;
     for(int i=0;i<wa*ha;i++) delta+=matchA[i].cost;
-	for(int i=0;i<wb*hb;i++) delta+=matchB[i].cost;
+    for(int i=0;i<wb*hb;i++) delta+=matchB[i].cost;
+
 
     printf("time=%12.6f  redox=%10d  vide=%3d%% collisions=%3d%% vide= %d (%d,%d)\n",now,redox,holes/(nbvote/100),
            collision/(count/100), vide,nbvote,count);
@@ -614,17 +619,25 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
 }
 
 
+int leopard::sumCost() {
+    int sum=0;
+    for(int i=0; i<wc*hc; i++) {
+        if(matchCam[i].cost < 1000)
+            sum+=matchCam[i].cost;
+    }
+    return sum;
+}
+
+
 void leopard::shiftCodes (int shift, unsigned long *codes, int w, int h) {
-
-     //150000
     printf("\n Code Cam \n");
-    dumpCode(codes + 2305200 * nb);
+    dumpCode(codes + 256300 * nb);
 
-    for(int i = 0; i < w*h; i++) {
+    for(int i=0; i<w*h; i++) {
         //la fin du dernier code
         unsigned long mem = codes[i*nb+nb-1];
         int s = nbb%64;
-        for(int j = nb-1; j >= 0; j--) {
+        for(int j=nb-1; j>=0; j--) {
             if(j > 0) {
                 codes[i*nb+j] = (codes[i*nb+j] >> shift) | (codes[i*nb+j-1] << (s - shift));
             }
@@ -635,27 +648,26 @@ void leopard::shiftCodes (int shift, unsigned long *codes, int w, int h) {
         }
     }
     printf("\n");
-    dumpCode(codes + 2305200 * nb);
+    dumpCode(codes + 256300 * nb);
     printf("\n");
     printf("\n");
 }
 
 
-void leopard::doShiftCodes() {
+int leopard::doShiftCodes() {
     //create a file
-    string const myFile("/home/chaima/Documents/Mathematica/Sum.txt");
-    std::ofstream sumVide(myFile.c_str());
+//    string const myFile("/home/chaima/Documents/Mathematica/Sum.txt");
+//    std::ofstream sumVide(myFile.c_str());
 
     int sum[nbb];
-    for(int i = 0; i < nbb; i++) {
+    for(int i=0; i<nbb; i++) {
 
         printf("\n\n--------------------- itr %d ---------%3d%% --------------------- \n\n",
                i, (i*100)/nbb);
 
         int videCam=0, videProj=0;
         prepareMatch();
-        for(int k = 0; k < 2; k++) {
-            //lsh(0,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp);
+        for(int k=0; k<2; k++) {
              srand(1656+k);
             videCam += lsh(1,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp);
              srand(1678+k);
@@ -664,33 +676,35 @@ void leopard::doShiftCodes() {
         sum[i] = videCam + videProj;
         printf("\n sum[%d] = %d \n", i, sum[i]);
 
+        //File Sum.txt
         ////////////////
-        //write
-        sumVide.open("/home/chaima/Documents/Mathematica/Sum.txt", std::fstream::app);
+//        sumVide.open("/home/chaima/Documents/Mathematica/Sum.txt", std::fstream::app);
 
-        if (!sumVide ) {
-            sumVide.open("/home/chaima/Documents/Mathematica/Sum.txt");
-            sumVide <<"\n";
-            sumVide.close();
+//        if (!sumVide ) {
+//            sumVide.open("/home/chaima/Documents/Mathematica/Sum.txt");
+//            sumVide <<"\n";
+//            //sumVide << sum[i] << "\n";
+//            sumVide.close();
 
-        }
-        else {
-            sumVide << sum[i] <<"\n";
-            sumVide.close();
-        }
+//        }
+//        else {
+//            sumVide << sum[i-1] <<"\n";
+//            if(i == nbb-1) sumVide << sum[i] <<"\n";
+//            sumVide.close();
+//        }
         ///////////////
 
         shiftCodes(1, codeCam, wc, hc);
     }
 
-    double min = sum[0];
+    int min = sum[0];
     printf("\n--------------------- Terminé ! ----- 100%% ---------------------");
-    printf("\n minInit = %f ", min);
+    printf("\n minInit = %d", min);
     int pos = 0;
-    for(int i = 1; i < nbb; i++)
+    for(int i=1; i<nbb; i++)
         if(sum[i] < min) { pos = i; min = sum[i];}
 
-    printf("\n min = %f et pos = %d \n", min, pos);
+    printf("\n min = %d et pos = %d \n", min, pos);
 
     if((pos != 0)) {
         if (pos > (nbb%64)) {
@@ -709,6 +723,8 @@ void leopard::doShiftCodes() {
             shiftCodes(pos, codeCam, wc, hc);
         }
     }
+
+    return pos;
 }
 
 
@@ -730,7 +746,7 @@ int leopard::heuristique(unsigned long *codeA,minfo *matchA,unsigned char *maskA
 		// regarde autour de j
 		for(k=0;k<8;k++) {
 			int jj=j+dj[k];
-            if( jj<0 || jj>=wb*hb ) {printf("\n test %d \n", k);continue; }
+            if( jj<0 || jj>=wb*hb ) continue;
 			int c=cost(codeA+i*nb,codeB+jj*nb);
 			if( c<matchA[i].cost ) { matchA[i].idx=jj;matchA[i].cost=c; }
 			if( c<matchB[jj].cost ) { matchB[jj].idx=i;matchB[jj].cost=c; }
