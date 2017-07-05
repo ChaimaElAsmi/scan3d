@@ -119,7 +119,7 @@ void testLeopardChaima() {
         nameProj = "data/proj1/leopard_2560_1080_32B_%03d.jpg";
     }
     else {
-        nameCam  = "data/cam2_08/cam_%03d.jpg";
+        nameCam  = "data/calib/damier_08/cam_%03d.jpg";
         nameProj = "data/proj2/leopard_1280_720_%03d.jpg";
     }
     //////////////////
@@ -132,7 +132,7 @@ void testLeopardChaima() {
     //Camera: Images / Code simple
     Mat *imagesCam;
     imagesCam = L->readImages((char *) nameCam.c_str(), from, from+nb-1, 0);
-    L->computeMask(1,imagesCam,nb,0.5,5.0,1,0,0);
+    L->computeMask(1,imagesCam,nb,0.45,5.0,1,0,0);
     L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
 
     //Projecteur: Images / Code simple
@@ -260,9 +260,8 @@ void testLeopardChaima() {
 
     L->makeLUT(lutCam,1);
     L->makeLUT(lutProj,0);
-
-    imwrite("lutcam.png",lutCam);
-    imwrite("lutproj.png",lutProj);
+    imwrite("calibration/LUT/new/lutcam_08.png",lutCam);
+    imwrite("calibration/LUT/new/lutproj_08.png",lutProj);
 
 //    imwrite(format("lsh/SP/objet_60Y/lutcam_%.2f.png", k),lutCam);
 //    imwrite(format("lsh/SP/objet_60Y/lutproj_%.2f.png", k),lutProj);
