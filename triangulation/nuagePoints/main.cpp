@@ -129,28 +129,11 @@ int main(int argc, char *argv[])
             p = pointsLut.ptr<Point3_<uchar> >(i,j);
             pointsCorr.at<Vec3s>(i,j)=Vec3s( (p->x*1770)/65535, (p->y*lutr)/65535, (p->z*lutc)/65535);
 
-            //imprimer le (i,j) pour voir s'ils vont jusqu'à la fin du tableau
-            //vérifier pourquoi les dernieres valeurs sont pas modifiés
-            //y a un truc dans la boucle qui cloche
-            //ou alors c'est le tableau qui est plus grand (imprimer les cols/rows des tableaux)
-
-
             //printf("red  %u  green  %u   blue   %u \n", p->z, p->y, p->x);
         }
     }
 
     //cout << pointsCorr << endl;
-
-    //    for(int i=0; i<lutr; i+=pas) {
-//        for(int j=0; j<lutc; j+=pas) {
-//            pointsLut.at<uchar>(i-pas, j-pas) = lut.at<uchar>(i,j);
-//            p = pointsLut.ptr<Point3_<uchar> >(i-pas,j-pas);
-
-//            //printf("points : %u \n pointss : %u \n ", pointsLut.at<uchar>(i,j), lut.at<uchar>(i,j));
-//            printf("red  %u  green  %u   blue   %u \n", p->z, p->y, p->x);
-//        }
-//    }
-
 
     //Triangulation
     Mat point4D = Mat::zeros(4, (int)(pointsLut.cols/pas), CV_64F);
