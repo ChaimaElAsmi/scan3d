@@ -170,37 +170,10 @@ int main(int argc, char *argv[])
 //    imshow("Display LUT", lutproj);
 //    waitKey(0);
 
-<<<<<<< HEAD
-    int lutr = lut.rows;
-    int lutc = lut.cols;
-    cout << "rows " << lutr << endl << "cols " << lutc << endl;
-
-    Point3_<uchar>* p;
-    int pas = 1;
-    Mat pointsLut = Mat::zeros(2, (int)(lutr*lutc)/2, CV_64F);
-    Mat pointsLut2 = Mat::zeros(2, (int)(pointsLut.cols/pas), CV_64F);
-    Mat pointsCorr = Mat::zeros(2, (int)(pointsLut.cols/pas), CV_64F);
-
-    pointsLut = lut.reshape(3,2);
-
-    for(int i=0; i<pointsLut.rows; i++) {
-        for(int j=0; j<(int)(pointsLut.cols/pas); j++) {
-            //pointsLut2.at<uchar>(i, j) = pointsLut.at<uchar>(i,j*pas);
-            p = pointsLut.ptr<Point3_<uchar> >(i,j);
-            pointsCorr.at<Vec3s>(i,j)=Vec3s( (p->x*1770)/65535, (p->y*lutr)/65535, (p->z*lutc)/65535);
-
-            //printf("red  %u  green  %u   blue   %u \n", p->z, p->y, p->x);
-        }
-    }
-
-    //cout << pointsCorr << endl;
-=======
-
     Mat pointsLut;
     Mat pointsCorr;
     matrixCorr(pointsLut, pointsCorr, lutproj);
 
->>>>>>> chaima
 
     //Triangulation
 //    Mat point4D = Mat::zeros(4, (int)(size/pas), CV_64F);
