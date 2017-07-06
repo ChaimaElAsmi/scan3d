@@ -9,7 +9,12 @@
 using namespace cv;
 using namespace std;
 
-int initMat(String file, Mat internes, Mat rotation, Mat translation) {
+int initMat(String file, Mat &internes, Mat &rotation, Mat &translation) {
+
+    internes = Mat::zeros(3, 3, CV_64F);
+    rotation = Mat::zeros(3, 3, CV_64F);
+    translation = Mat::zeros(3, 1, CV_64F);
+
     string filename = "/home/chaima/Documents/scanGit/scan3d/calibration/" + file;
     FileStorage fs(filename, FileStorage::READ);
     if(!fs.isOpened()) {
@@ -25,7 +30,9 @@ int initMat(String file, Mat internes, Mat rotation, Mat translation) {
     return 0;
 }
 
-void composeProjectionMatrix(Mat projectionMatrix, Mat internes, Mat rotation, Mat translation) {
+void composeProjectionMatrix(Mat &projectionMatrix, Mat internes, Mat rotation, Mat translation) {
+
+    projectionMatrix = Mat::zeros(3, 4, CV_64F);
 
     Mat idt = Mat::eye(3, 4, CV_64F);
     Mat mat_trans = Mat::eye(4, 4, CV_64F);
@@ -54,14 +61,61 @@ void composeProjectionMatrix(Mat projectionMatrix, Mat internes, Mat rotation, M
     projectionMatrix = internes * idt * mat_rot * mat_trans;
 }
 
+void matrixCorr(Mat &pointsLut, Mat &pointsCorr, Mat lut) {
+
+    int lutr = lut.rows;
+    int lutc = lut.cols;
+    cout << "rowsLut " << lutr << endl << "colsLut " << lutc << endl;
+
+    unsigned short *p = (unsigned short*) lut.data;
+    unsigned short *q;
+    Mat mask = Mat::zeros(lutr, lutc, CV_8UC1);
+    int n=0;
+    for(int r=0; r<lutr; r+=10) {
+        for(int c=0; c<lutc; c+=10) {
+            q = p+r*lutc+c;
+            //printf("%d  %d  %d \n", q[0], q[1],q[3]);
+            float f = (float)q[0]/65535; //pourcentage d'erreur
+            if((q[0]==0) || (f>0.2)) continue;
+            mask.at<uchar>(r, c) = 255;
+            n++;
+        }
+    }
+    cout << "j'ai sélectionné " << n << " pixels" << endl;
+
+    imwrite("/home/chaima/Documents/scanGit/scan3d/triangulation/nuagePoints/mask.png", mask);
+
+    pointsLut = Mat::zeros(2, n, CV_64F);
+    pointsCorr = Mat::zeros(2, n, CV_64F);
+
+    n=0;
+    for(int r=0; r<lutr; r++) {
+        for(int c=0; c<lutc; c++) {
+            if(mask.at<uchar>(r, c) == 0) continue;
+
+            q = p+r*lutc+c;
+            printf("%d  %d  %d \n", q[0], q[1],q[3]);
+            pointsLut.at<double>(0,n) = c;
+            pointsLut.at<double>(1,n) = r;
+            pointsCorr.at<double>(0,n) = ((double)q[2]*640)/65535;
+            pointsCorr.at<double>(1,n) = ((double)q[1]*480)/65535;
+            printf("(%f, %f) -> (%f, %f) \n",pointsLut.at<double>(0,n),pointsLut.at<double>(1,n),
+                                             pointsCorr.at<double>(0,n),pointsCorr.at<double>(1,n));
+            n++;
+        }
+    }
+
+    cout << "pointsCorr = " << pointsCorr.rows << "    " << pointsCorr.cols << endl;
+}
+
 
 int main(int argc, char *argv[])
 {
     //Projecteur
     String fileProj = "out_projector_data.xml";
-    Mat int_proj = Mat::zeros(3, 3, CV_64F);
-    Mat rot_proj = Mat::zeros(3, 3, CV_64F);
-    Mat trans_proj = Mat::zeros(3, 1, CV_64F);
+    Mat int_proj;
+    Mat rot_proj;
+    Mat trans_proj;
 
     //Récupérer les matrices internes, rotation et translation
     initMat(fileProj, int_proj, rot_proj, trans_proj);
@@ -72,7 +126,7 @@ int main(int argc, char *argv[])
     cout << endl;
     cout << "Translation = " << endl << trans_proj << endl << endl;
 
-    Mat projectionMatrixProj = Mat::zeros(3, 4, CV_64F);
+    Mat projectionMatrixProj;
 
     //composer la matrice de projection
     composeProjectionMatrix(projectionMatrixProj, int_proj, rot_proj, trans_proj);
@@ -82,9 +136,9 @@ int main(int argc, char *argv[])
 
     //Caméra
     String fileCam = "out_camera_data.xml";
-    Mat int_cam = Mat::zeros(3, 3, CV_64F);
-    Mat rot_cam = Mat::zeros(3, 3, CV_64F);
-    Mat trans_cam = Mat::zeros(3, 1, CV_64F);
+    Mat int_cam;
+    Mat rot_cam;
+    Mat trans_cam;
 
     //Récupérer les matrices internes, rotation et translation
     initMat(fileCam, int_cam, rot_cam, trans_cam);
@@ -96,21 +150,27 @@ int main(int argc, char *argv[])
     cout << endl;
     cout << "Translation = " << endl << trans_cam << endl << endl;
 
-    Mat projectionMatrixCam = Mat::zeros(3, 4, CV_64F);
+    Mat projectionMatrixCam;
 
     //composer la matrice de projection
     composeProjectionMatrix(projectionMatrixCam, int_cam, rot_cam, trans_cam);
 
     cout << "proj = " << endl << projectionMatrixCam << endl;
 
-    //Lecture de la LUT du projecteur
-    String filename = "/home/chaima/Documents/scanGit/scan3d/calibration/LUT/new/lutproj_08.png";
-    Mat lut = imread(filename, CV_LOAD_IMAGE_COLOR);
+    //Lecture de la LUT de la caméra et du projecteur
+    String filename = "/home/chaima/Documents/scanGit/scan3d/calibration/LUT/new/";
+    String nameCam  = "lutcam_08.png";
+    String nameProj  = "lutproj_08.png";
+    Mat lutcam  = imread(filename + nameCam, CV_LOAD_IMAGE_UNCHANGED);
+    Mat lutproj = imread(filename + nameProj, CV_LOAD_IMAGE_UNCHANGED);
 
 //    namedWindow("Display LUT", 1);
-//    imshow("Display LUT", lut);
+//    imshow("Display LUT", lutcam);
+//    waitKey(0);
+//    imshow("Display LUT", lutproj);
 //    waitKey(0);
 
+<<<<<<< HEAD
     int lutr = lut.rows;
     int lutc = lut.cols;
     cout << "rows " << lutr << endl << "cols " << lutc << endl;
@@ -134,10 +194,17 @@ int main(int argc, char *argv[])
     }
 
     //cout << pointsCorr << endl;
+=======
+
+    Mat pointsLut;
+    Mat pointsCorr;
+    matrixCorr(pointsLut, pointsCorr, lutproj);
+
+>>>>>>> chaima
 
     //Triangulation
-    Mat point4D = Mat::zeros(4, (int)(pointsLut.cols/pas), CV_64F);
-    triangulatePoints(projectionMatrixProj, projectionMatrixCam, pointsLut2, pointsCorr, point4D);
+//    Mat point4D = Mat::zeros(4, (int)(size/pas), CV_64F);
+//    triangulatePoints(projectionMatrixProj, projectionMatrixCam, pointsLut, pointsCorr, point4D);
 
 //    double w = point4D.at<double>(3,0);
 //    double x = point4D.at<double>(0,0)/w;
