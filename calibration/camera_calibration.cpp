@@ -319,6 +319,8 @@ int main(int argc, char* argv[])
 
                 // Draw the corners.
                 drawChessboardCorners( view, s.boardSize, Mat(pointBuf), found );
+                imwrite("/home/chaima/Documents/scanGit/scan3d/calibration/view.png",view);
+
         }
 
         //----------------------------- Output Text ------------------------------------------------
@@ -549,6 +551,11 @@ static void saveCameraParams( Settings& s, Size& imageSize, Mat& cameraMatrix, M
                 fs << "Rotation" << rot_mat;
                 fs << "Translation" << tvecs[i];
             }
+
+            //Toutes les rotations et translations
+//            Rodrigues(rvecs[i], rot_mat);
+//            fs << "Rotation" << rot_mat;
+//            fs << "Translation" << tvecs[i];
 
             r = rvecs[i].t();
             t = tvecs[i].t();
