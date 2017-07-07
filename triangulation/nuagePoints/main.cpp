@@ -133,7 +133,7 @@ void undistortMatrix(Mat &pointsOutput, Mat pointsInput, Mat internes, Mat distC
     cout << points1D.at<Vec2d>(0) << "  ->  " << pointsOutput.at<Vec2d>(0) << endl;
 }
 
-int bbb(String nameSrc, Mat internesSrc, Mat distCoeffsSrc, Mat &pointsUndSrc,
+int lut2corr(String nameSrc, Mat internesSrc, Mat distCoeffsSrc, Mat &pointsUndSrc,
          String nameDst, Mat internesDst, Mat distCoeffsDst, Mat &pointsUndDst) {
 
     //Lecture de la LUT de la caméra et du projecteur
@@ -242,41 +242,7 @@ int main(int argc, char *argv[])
     composePoseMatrix(poseMatrixCam, rot_cam, trans_cam);
 
     cout << "   Matrice [R|t] = " << endl << poseMatrixCam << endl;
-/*
-    //Lecture de la LUT de la caméra et du projecteur
-    String filename = "/home/chaima/Documents/scanGit/scan3d/calibration/LUT/new/";
-    String nameCam  = "lutcam_08.png";
-    String nameProj  = "lutproj_08.png";
-    Mat lutcam  = imread(filename + nameCam, CV_LOAD_IMAGE_UNCHANGED);
-    Mat lutproj = imread(filename + nameProj, CV_LOAD_IMAGE_UNCHANGED);
 
-//    namedWindow("Display LUT", 1);
-//    imshow("Display LUT", lutcam);
-//    waitKey(0);
-//    imshow("Display LUT", lutproj);
-//    waitKey(0);
-
-    int size;
-    Mat pointsLut;
-    Mat pointsCorr;
-    cout << endl << endl;
-    cout << "--------------------------" << endl;
-    cout << "Taille des Luts :" << endl;
-    cout << "--------------------------" << endl;
-    //lutproj -> lutcam
-    size = matrixCorr(pointsLut, pointsCorr, lutproj, lutcam);
-
-    //lutcam -> lutproj
-    //size = matrixCorr(pointsLut, pointsCorr, lutcam, lutproj);
-
-    //Undistort points projector
-    Mat pointsUndLut;
-    undistortMatrix(pointsUndLut, pointsLut, int_proj, distCoeffs_proj);
-
-    //Undistort points camera
-    Mat pointsUndCorr;
-    undistortMatrix(pointsUndCorr, pointsCorr, int_cam, distCoeffs_cam);
-*/
 
     //Init
     String nameProj  = "lutproj_08.png";
@@ -289,7 +255,7 @@ int main(int argc, char *argv[])
 
     /*----------------------------- Proj -> Cam -----------------------------*/
     //Triangulation
-    size = bbb(nameProj, int_proj, distCoeffs_proj, pointsUndLut,
+    size = lut2corr(nameProj, int_proj, distCoeffs_proj, pointsUndLut,
                nameCam,  int_cam,  distCoeffs_cam,  pointsUndCorr);
 
     point4D = Mat::zeros(4, size, CV_64F);
@@ -297,7 +263,7 @@ int main(int argc, char *argv[])
 
     /*----------------------------- Cam -> Proj -----------------------------*/
     //Triangulation
-//    size = bbb(nameCam,  int_cam,  distCoeffs_cam,  pointsUndLut,
+//    size = lut2corr(nameCam,  int_cam,  distCoeffs_cam,  pointsUndLut,
 //               nameProj, int_proj, distCoeffs_proj, pointsUndCorr);
 
 //    point4D = Mat::zeros(4, size, CV_64F);
