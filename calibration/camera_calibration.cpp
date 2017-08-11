@@ -15,6 +15,11 @@
 using namespace cv;
 using namespace std;
 
+//Cam  = 1   ->    Calibrer la caméra
+//Proj = 0   ->    Calibrer le projecteur
+int cam = 0;
+
+
 static void help()
 {
     cout <<  "This is a camera calibration sample." << endl
@@ -31,6 +36,16 @@ public:
 
     void write(FileStorage& fs) const                        //Write serialization for this class
     {
+        String var1, var2;
+        if(cam) {
+            var1="InputC";
+            var2="Write_outputFileNameC";
+        }
+        else {
+            var1="InputP";
+            var2="Write_outputFileNameP";
+        }
+
         fs << "{" << "BoardSize_Width"  << boardSize.width
                   << "BoardSize_Height" << boardSize.height
                   << "Square_Size"         << squareSize
@@ -42,14 +57,15 @@ public:
 
                   << "Write_DetectedFeaturePoints" << bwritePoints
                   << "Write_extrinsicParameters"   << bwriteExtrinsics
-                  << "Write_outputFileName"  << outputFileName
+                  << var2  << outputFileName
 
                   << "Show_UndistortedImage" << showUndistorsed
 
                   << "Input_FlipAroundHorizontalAxis" << flipVertical
                   << "Input_Delay" << delay
-                  << "Input" << input
+                  << var1 << input
            << "}";
+
     }
     void read(const FileNode& node)                          //Read serialization for this class
     {
@@ -61,12 +77,18 @@ public:
         node["Calibrate_FixAspectRatio"] >> aspectRatio;
         node["Write_DetectedFeaturePoints"] >> bwritePoints;
         node["Write_extrinsicParameters"] >> bwriteExtrinsics;
-        node["Write_outputFileName"] >> outputFileName;
+        if(cam)
+            node["Write_outputFileNameC"] >> outputFileName;
+        else
+            node["Write_outputFileNameP"] >> outputFileName;
         node["Calibrate_AssumeZeroTangentialDistortion"] >> calibZeroTangentDist;
         node["Calibrate_FixPrincipalPointAtTheCenter"] >> calibFixPrincipalPoint;
         node["Input_FlipAroundHorizontalAxis"] >> flipVertical;
         node["Show_UndistortedImage"] >> showUndistorsed;
-        node["Input"] >> input;
+        if(cam)
+            node["InputC"] >> input;
+        else
+            node["InputP"] >> input;
         node["Input_Delay"] >> delay;
         interprate();
     }
@@ -462,7 +484,12 @@ static bool runCalibration( Settings& s, Size& imageSize, Mat& cameraMatrix, Mat
 
 
     //Find intrinsic and extrinsic camera parameters
-    double rms = calibrateCamera(objectPoints, imagePoints, imageSize, cameraMatrix,
+    double rms;
+    if(cam)
+        rms = calibrateCamera(objectPoints, imagePoints, imageSize, cameraMatrix,
+                                 distCoeffs, rvecs, tvecs, s.flag|CV_CALIB_FIX_K4|CV_CALIB_FIX_K5);
+    else
+        rms = calibrateCamera(objectPoints, imagePoints, imageSize, cameraMatrix,
                                  distCoeffs, rvecs, tvecs, s.flag|CV_CALIB_FIX_K1|
                                  CV_CALIB_FIX_K2|CV_CALIB_FIX_K3|CV_CALIB_FIX_K4|CV_CALIB_FIX_K5);
 
@@ -518,13 +545,8 @@ static void saveCameraParams( Settings& s, Size& imageSize, Mat& cameraMatrix, M
     fs << "flagValue" << s.flag;
 
     fs << "Camera_Matrix" << cameraMatrix;
-    //////////////////////////////////////////////////////////////
-    //Distortion
-    fs << "Distortion_Coefficients" << distCoeffs;
 
-    fs << "Avg_Reprojection_Error" << totalAvgErr;
-    if( !reprojErrs.empty() )
-        fs << "Per_View_Reprojection_Errors" << Mat(reprojErrs);
+    fs << "Distortion_Coefficients" << distCoeffs;    
 
     Mat rot_mat = Mat::zeros(3,3,CV_64F);
 
@@ -565,6 +587,9 @@ static void saveCameraParams( Settings& s, Size& imageSize, Mat& cameraMatrix, M
         fs << "Extrinsic_Parameters" << bigmat;
     }
 
+    fs << "Avg_Reprojection_Error" << totalAvgErr;
+    if( !reprojErrs.empty() )
+        fs << "Per_View_Reprojection_Errors" << Mat(reprojErrs);
 
     if( !imagePoints.empty() )
     {

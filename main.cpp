@@ -119,7 +119,7 @@ void testLeopardChaima() {
         nameProj = "data/proj1/leopard_2560_1080_32B_%03d.jpg";
     }
     else {
-        nameCam  = "data/calib/damier_08/cam_%03d.jpg";
+        nameCam  = "data/calib/visage_04/cam_%03d.jpg";
         nameProj = "data/proj2/leopard_1280_720_%03d.jpg";
     }
     //////////////////
@@ -260,8 +260,8 @@ void testLeopardChaima() {
 
     L->makeLUT(lutCam,1);
     L->makeLUT(lutProj,0);
-    imwrite("calibration/LUT/new/lutcam_08.png",lutCam);
-    imwrite("calibration/LUT/new/lutproj_08.png",lutProj);
+    imwrite("calibration/LUT/new/vis/lutcam_04.png",lutCam);
+    imwrite("calibration/LUT/new/vis/lutproj_04.png",lutProj);
 
 //    imwrite(format("lsh/SP/objet_60Y/lutcam_%.2f.png", k),lutCam);
 //    imwrite(format("lsh/SP/objet_60Y/lutproj_%.2f.png", k),lutProj);
