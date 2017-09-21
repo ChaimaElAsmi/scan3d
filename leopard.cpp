@@ -337,6 +337,7 @@ void leopard::computeCodes(int cam,int type,cv::Mat *img) {
         nb=(nbb+63)/64; // parce qu'on utilise des long
         printf("nbb=%d nb=%d\n",nbb,nb);
         code=(unsigned long *)malloc(w*h*nb*sizeof(unsigned long));
+
         for(int i=0;i<w*h*nb;i++) code[i]=0;
 
         double t1=horloge();
@@ -634,19 +635,36 @@ void leopard::shiftCodes (int shift, unsigned long *codes, int w, int h) {
     dumpCode(codes + 256300 * nb);
 
     for(int i=0; i<w*h; i++) {
-        //la fin du dernier code
-        unsigned long mem = codes[i*nb+nb-1];
-        int s = nbb%64;
-        for(int j=nb-1; j>=0; j--) {
-            if(j > 0) {
-                codes[i*nb+j] = (codes[i*nb+j] >> shift) | (codes[i*nb+j-1] << (s - shift));
+        //la fin du premier code
+        unsigned long mem = codes[i*nb];
+        int s = 64;
+        for(int j=0; j<nb; j++) {
+            if(j < nb-1) {
+                codes[i*nb+j] = (codes[i*nb+j] >> shift) | (codes[i*nb+j+1] << (s - shift));
             }
             else {
+                s = nbb%64;
                 codes[i*nb+j] = (codes[i*nb+j] >> shift) | (mem << (s - shift));
             }
-        s = 64;
         }
     }
+
+
+//    for(int i=0; i<w*h; i++) {
+//        //la fin du dernier code
+//        unsigned long mem = codes[i*nb+nb-1];
+//        int s = nbb%64;
+//        for(int j=nb-1; j>=0; j--) {
+//            if(j > 0) {
+//                codes[i*nb+j] = (codes[i*nb+j] >> shift) | (codes[i*nb+j-1] << (s - shift));
+//            }
+//            else {
+//                codes[i*nb+j] = (codes[i*nb+j] >> shift) | (mem << (s - shift));
+//            }
+//        s = 64;
+//        }
+//    }
+
     printf("\n");
     dumpCode(codes + 256300 * nb);
     printf("\n");

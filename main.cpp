@@ -119,15 +119,15 @@ void testLeopardChaima() {
         nameProj = "data/proj1/leopard_2560_1080_32B_%03d.jpg";
     }
     else {
-        nameCam  = "data/calib/visage_04/cam_%03d.jpg";
-        nameProj = "data/proj2/leopard_1280_720_%03d.jpg";
+        nameCam  = "data/objet/images_240/cam_%04d.jpg";
+        nameProj = "/home/chaima/Documents/Mathematica/Images/1280x720/Patterns_240/leopard_1280_720_%04d.jpg";
     }
     //////////////////
 
     double timeS = horloge();
 
     leopard *L=new leopard();
-    int nb = 60;
+    int nb = 240;
     int from = 20;
     //Camera: Images / Code simple
     Mat *imagesCam;
@@ -174,8 +174,9 @@ void testLeopardChaima() {
         imagesProjMix[i] = imagesProj[i]*0.5 + imagesProj[i+1]*0.5;
     imagesProjMix[nb-1] = imagesProj[nb-1];
 
-    L->computeCodes(1,LEOPARD_QUADRATIC,imagesCamDecal);
-    L->computeCodes(0,LEOPARD_QUADRATIC,imagesProjMix);
+    //QUAD
+    L->computeCodes(1,LEOPARD_SIMPLE,imagesCamDecal);
+    L->computeCodes(0,LEOPARD_SIMPLE,imagesProjMix);
 
     for(int j=0; j<10; j++)
         L->doLsh();
@@ -188,8 +189,9 @@ void testLeopardChaima() {
         imagesProjMix[i] = imagesProj[i]*0.5 + imagesProj[i-1]*0.5;
     imagesProjMix[0] = imagesProj[0];
 
-    L->computeCodes(1,LEOPARD_QUADRATIC,imagesCamDecal);
-    L->computeCodes(0,LEOPARD_QUADRATIC,imagesProjMix);
+    //QUAD
+    L->computeCodes(1,LEOPARD_SIMPLE,imagesCamDecal);
+    L->computeCodes(0,LEOPARD_SIMPLE,imagesProjMix);
 
     for(int j=0; j<10; j++)
         L->doLsh();
@@ -216,8 +218,9 @@ void testLeopardChaima() {
                 imagesProjMix[i] = imagesProjSP[i]*(1-fct) + imagesProjSP[i+1]*fct;
             imagesProjMix[nb-1] = imagesProjSP[nb-1];
 
-            L->computeCodes(1,LEOPARD_QUADRATIC,imagesCamDecal);
-            L->computeCodes(0,LEOPARD_QUADRATIC,imagesProjMix);
+            //QUAD
+            L->computeCodes(1,LEOPARD_SIMPLE,imagesCamDecal);
+            L->computeCodes(0,LEOPARD_SIMPLE,imagesProjMix);
 
             //TEST
             //L->prepareMatch();
@@ -240,8 +243,9 @@ void testLeopardChaima() {
                 imagesProjMix[i] = imagesProjSP[i]*(1-fct) + imagesProjSP[i-1]*fct;
             imagesProjMix[0] = imagesProjSP[0];
 
-            L->computeCodes(1,LEOPARD_QUADRATIC,imagesCamDecal);
-            L->computeCodes(0,LEOPARD_QUADRATIC,imagesProjMix);
+            //QUAD
+            L->computeCodes(1,LEOPARD_SIMPLE,imagesCamDecal);
+            L->computeCodes(0,LEOPARD_SIMPLE,imagesProjMix);
 
             //TEST
             //L->prepareMatch();
@@ -260,8 +264,8 @@ void testLeopardChaima() {
 
     L->makeLUT(lutCam,1);
     L->makeLUT(lutProj,0);
-    imwrite("calibration/LUT/new/vis/lutcam_04.png",lutCam);
-    imwrite("calibration/LUT/new/vis/lutproj_04.png",lutProj);
+    imwrite("calibration/LUT/objet/lutcam_T.png",lutCam);
+    imwrite("calibration/LUT/objet/lutproj_T.png",lutProj);
 
 //    imwrite(format("lsh/SP/objet_60Y/lutcam_%.2f.png", k),lutCam);
 //    imwrite(format("lsh/SP/objet_60Y/lutproj_%.2f.png", k),lutProj);
@@ -284,7 +288,7 @@ void testLeopardChaima() {
 
 int main(int argc, char *argv[]) {
 
-    int nbImages = 100;
+    int nbImages = 300;
     Mat img[nbImages];
 
     char *user=getenv("USER");
@@ -309,36 +313,56 @@ int main(int argc, char *argv[]) {
     exit(0);
 
     VideoCapture cap(1);
-    if(!cap.isOpened())
-        return -1;
 
     for(int i = 0; i < 30; i++)
         cap >> img[0]; //Démarrer la caméra
 
-    cout << "Camera ready" << endl;
+    cout << "Pres" << endl;
+    waitKey(0);
+
+    if(!cap.isOpened())
+        return -1;
+
+    //Video vlc monitor screen
+    //system("vlc --qt-fullscreen-screennumber=1 -f
+      //     '/home/chaima/Documents/Mathematica/Video/sequence5_32.mp4' "
+      //     "--play-and-exit --no-video-title-show --aspect-ratio 4:3 &");
+    //Video vlc default screen
+    // system("vlc '/home/chaima/Documents/Mathematica/Video/sequence3.mp4' "
+       //     "-f --play-and-exit --no-video-title-show &");
+    //Vidéo mplayer
+    //system("mplayer '/home/chaima/Documents/Mathematica/Video/sequence3.mp4' "
+      //     "-geometry 800x600+1366+0 -noborder -aspect 4:3 &");
 
     srand(time(NULL));
     int random = rand() % 500000;
-    cout << "Camera wait (random) : " << random << endl;
+    cout << "random : " << random << endl;
     usleep(random);
 
     double timeS = horloge();
-    //Capture
-    for(int i = 0; i < nbImages; i++)
+    for(int i = 0; i < nbImages; i++) {
         cap >> img[i];
-
+        //resize(img[i], resized[i], Size(640,480)); //(683,384)
+    }
     double timeE = horloge();
-    cout << "Time (30 images) : " << ((timeE - timeS) / nbImages) * 30 << endl;
+
+    cout << "Time : " << (timeE - timeS) / nbImages << endl;
+    cout << "Time (" << nbImages << " images): " << (timeE - timeS) << endl;
+    waitKey(0);
 
     namedWindow("Display Image", 1);
+    //Changer la fenetre d'affichage
+    /*resizeWindow("Display Image", 800, 600);
+    moveWindow("Display Image", 1366, 0);*/
 
-    //Save and Show
     for(int i = 0; i < nbImages; i++) {
-        imwrite( format("/home/chaima/Documents/Workspace/CaptureVid2/Images/testGit/image_%04d.jpg",
-        i), img[i] );
+        //imwrite( format("/home/chaima/Documents/Workspace/CaptureVid2/Images/Seq4/tests/test%d"
+                      //  "/image_%04d.jpg", (j + 1), i) , img[i] );
+
+        imwrite( format("/home/chaima/Documents/scanGit/scan3d/data/objet/images_240/cam_%03d.jpg",
+                          i), img[i] );
 
         imshow("Display Image", img[i]);
-
         waitKey(30);
     }
 
