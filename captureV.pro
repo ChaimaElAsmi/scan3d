@@ -9,15 +9,17 @@ CONFIG -= app_bundle
 TEMPLATE = app
 
 INCLUDEPATH += /usr/local/include/opencv
-LIBS += -L/usr/local/lib -lopencv_core  -lopencv_highgui -lopencv_photo -lopencv_video -lopencv_imgproc
+LIBS += -L/usr/local/lib -lopencv_core  -lopencv_highgui -lopencv_photo -lopencv_video -lopencv_imgproc -lopencv_calib3d
 
 
 
 #-lopencv_imgcodecs  -lopencv_videoio
 
 
-SOURCES += main.cpp
+SOURCES += main.cpp \
+    triangulation.cpp
 SOURCES += leopard.cpp
 
 HEADERS += \
-    leopard.hpp
+    leopard.hpp \
+    triangulation.hpp

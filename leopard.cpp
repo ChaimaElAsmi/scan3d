@@ -48,6 +48,7 @@ leopard::leopard() {
 
     for(int i=0;i<65536;i++) bt[i]=bitCountOrig(i);
     //for(int i=0;i<65536;i++) printf("%3d : %3d\n",i,bt[i]);
+    initSP();
 }
 
 leopard::~leopard() {
@@ -58,6 +59,7 @@ leopard::~leopard() {
     if( codeProj ) free(codeProj);
 	if( matchCam ) free(matchCam);
 	if( matchProj ) free(matchProj);
+    unInitSP();
 }
 
 
@@ -67,19 +69,25 @@ double leopard::horloge() {
 	return((double)tv.tv_sec+tv.tv_usec/1000000.0);
 }
 
-cv::Mat *leopard::readImages(char *name,int from,int to, int decal) {
+//On passe le nom des images
+cv::Mat *leopard::readImages(char *name,int from,int to, double fct) {
     printf("-- reading images %s --\n",name);
     int nb,i;
     char buf[300];
     nb=to-from+1;
     Mat *image=new Mat[nb];
     int w=0,h=0;
-   // int j=rand()%nb;// testestestestests
 
     for(i=0;i<nb;i++) {
-        sprintf(buf,name,(i+decal)%nb+from);
-        printf("read %d %d %s\n",i,(i+decal)%nb,buf);
-        image[i] = imread(buf,CV_LOAD_IMAGE_GRAYSCALE);
+        sprintf(buf,name,i+from);
+        printf("read %d %s\n",i,buf);
+        if(fct>0) {
+            Mat tmp = imread(buf,CV_LOAD_IMAGE_GRAYSCALE);
+            resize(tmp, image[i],cvSize(0,0),0.5,0.5);
+        }
+        else{
+            image[i] = imread(buf,CV_LOAD_IMAGE_GRAYSCALE);
+        }
         //printf("loaded %d x %d\n",image[i].cols,image[i].rows);
         if( i==0 ) {
             w=image[i].cols;
@@ -94,6 +102,32 @@ cv::Mat *leopard::readImages(char *name,int from,int to, int decal) {
     }
     return image;
 }
+
+//On passe les images directement
+cv::Mat *leopard::readImages2(Mat *cam,int from,int to) {
+    printf("-- reading images camera --\n");
+    int nb,i;
+    nb=to-from+1;
+    Mat *image=new Mat[nb];
+    int w=0,h=0;
+
+    for(i=0;i<nb;i++) {  
+        printf("read %d cam_%d \n",i,i+from-1);
+        cvtColor(cam[i+from], image[i], CV_RGB2GRAY);
+        if( i==0 ) {
+            w=image[i].cols;
+            h=image[i].rows;
+        }else{
+            if( w!=image[i].cols || h!=image[i].rows ) {
+                printf("Images %d pas de la meme taille!\n",i+from);
+                delete[] image;
+                return NULL;
+            }
+        }
+    }
+    return image;
+}
+
 
 //
 // On calcule un ratio binmodal/unimodal
@@ -463,9 +497,108 @@ void leopard::prepareMatch() {
     if(matchProj==NULL) matchProj=(minfo *)malloc(wp*hp*sizeof(minfo));
 
     // initialise avec le cout le plus eleve pour avoir un match valide mais si inactif
-    for(int i=0;i<wc*hc;i++) { matchCam[i].idx=0; matchCam[i].cost=9999; }
-    for(int i=0;i<wp*hp;i++) { matchProj[i].idx=0; matchProj[i].cost=9999; }
+    for(int i=0;i<wc*hc;i++) { matchCam[i].idx=0; matchCam[i].cost=9999;
+        matchCam[i].subpx=0.0; matchCam[i].subpy=0.0; }
+    for(int i=0;i<wp*hp;i++) { matchProj[i].idx=0; matchProj[i].cost=9999;
+        matchProj[i].subpx=0.0; matchProj[i].subpy=0.0; }
 }
+
+//test[w*w]
+double align(int* test, int* ref, double sx, double sy, int w) {
+    int dc=(sx>=0.0)?1:-1;
+    int dr=(sy>=0.0)?w:-w;
+    double fx=fabs(sx);
+    double fy=fabs(sy);
+    int sum=0;
+    for(int r=1;r<w-1;r++) {
+        for(int c=1;c<w-1;c++){
+            int pos = r*w+c;
+            double v1 = test[pos]*(1-fx)+test[pos+dc]*fx;
+            double v2 = test[pos+dr]*(1-fx)+test[pos+dr+dc]*fx;
+            double v = v1*(1-fy)+v2*fy;
+            double d = v-ref[pos];
+            sum += d*d;
+        }
+    }
+    return sum;
+}
+
+
+
+void leopard::initSP() {
+    wDecal=5;
+    ptsCam  = (int *) malloc((2*wDecal+1) * (2*wDecal+1) * sizeof(int));
+    ptsProj = (int *) malloc((2*wDecal+1) * (2*wDecal+1) * sizeof(int));
+}
+
+void leopard::unInitSP(){
+    free(ptsCam);
+    free(ptsProj);
+}
+
+//sousPixels pour le pixel i de la caméra
+//le point de départ caméra est un entier et le point d'arrivée projecteur est en sp
+void leopard::unSousPixels(int i) {
+    double t1=horloge();
+    //int step=wc*hc/100;
+
+    //for(int i=0; i<wc*hc; i++) {
+//        i=300*wc+300;
+//        int ix = i%wc;
+//        if((ix<10) || (ix>=wc-10)) continue;
+        if( i%wc==0 ) printf("%d\n",i/wc);
+        if( maskCam[i]==0 ) return;
+        int j = matchCam[i].idx;
+        int jy = j/wp;
+        int jx = j%wp;
+        if((jx<wDecal) || (jx>=wp-wDecal)) return;
+        if((jy<wDecal) || (jy>=hp-wDecal)) return;
+        //printf("i = %d, j = %d\n", i, j);
+
+        int pos = 0;
+        for(int dr=-wDecal; dr<=wDecal; dr++)
+            for(int dc=-wDecal; dc<=wDecal; dc++, pos++) {
+
+                int jj = j+dc+dr*wp;
+                //if( maskProj[jj]==0 ) continue;
+                int c1  = cost(codeCam+i*nb,codeProj+jj*nb);
+                int c2 = cost(codeProj+j*nb,codeProj+jj*nb);
+                ptsCam[pos] = c1;
+                ptsProj[pos] = c2;
+            }
+
+        //test un seul pixel
+        //if(i==300*wc+300) {
+        //choisir le shift qui minimise le cout
+        int n = 5;
+        double bestv=-1.0;
+        int bestsx=0;
+        int bestsy=0;
+        for(int sy=-(n-1);sy<n;sy++)
+            for(int sx=-(n-1);sx<n;sx++){
+                double v = align(ptsCam, ptsProj, (double) sx/n, (double) sy/n, 2*wDecal+1);
+                if(v<bestv || bestv<0){
+                    bestv=v;
+                    bestsx=sx;
+                    bestsy=sy;
+                }
+                //printf("%f \n",v);
+            }
+
+        //}
+        matchCam[i].subpx = (double) bestsx/n;
+        matchCam[i].subpy = (double) bestsy/n;
+    //}
+    double t2=horloge();
+    //printf("subpx temps=%12.6f\n", t2-t1);
+}
+
+void leopard::sousPixels() {
+    for(int i=0; i<wc*hc; i++) {
+        unSousPixels(i);
+    }
+}
+
 
 void leopard::forceBrute() {
     double t1=horloge();
@@ -486,11 +619,13 @@ void leopard::forceBrute() {
 
 int leopard::doLsh() {
     // de cam vers proj, dans les deux directions
-    lsh(0,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp);
-    lsh(1,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp);
+    //aisCam == 1
+    lsh(0,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp,1);
+    lsh(1,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp,1);
     // de proj vers cam, dans les deux directions
-    lsh(0,codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc);
-    lsh(1,codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc);
+    //aisCam == 0
+    lsh(0,codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc,0);
+    lsh(1,codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc,0);
     return 0;
 }
 
@@ -500,8 +635,13 @@ int leopard::doHeuristique() {
     return 0;
 }
 
+
+//aisCam ==  1  ->  pour codeA est la cam
+//aisCam ==  0  ->  pour codeB est la cam
+//aisCam == -1  ->  pas de sp
 int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
-			      unsigned long *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb) {
+                  unsigned long *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb,
+                 int aisCam) {
 	int nv=20; // nb de bits pour le vote
 	int nbvote=(1<<nv);
 	bminfo bm[nv];
@@ -583,8 +723,18 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
 
 			// match!
 			int c=cost(codeA+j*nb,codeB+i*nb);
-			if( c<matchA[j].cost ) { redox+=matchA[j].cost-c;matchA[j].idx=i;matchA[j].cost=c; }
-			if( c<matchB[i].cost ) { redox+=matchB[i].cost-c;matchB[i].idx=j;matchB[i].cost=c; }
+            if( c<matchA[j].cost ) {
+                redox+=matchA[j].cost-c;
+                matchA[j].idx=i;
+                matchA[j].cost=c;
+                if(aisCam==1) unSousPixels(j);
+            }
+            if( c<matchB[i].cost ) {
+                redox+=matchB[i].cost-c;
+                matchB[i].idx=j;
+                matchB[i].cost=c;
+                if(aisCam==0) unSousPixels(i);
+            }
 
 #if 0
             // extra search
@@ -687,9 +837,9 @@ int leopard::doShiftCodes() {
         prepareMatch();
         for(int k=0; k<2; k++) {
              srand(1656+k);
-            videCam += lsh(1,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp);
+            videCam += lsh(1,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp,-1);
              srand(1678+k);
-            videProj += lsh(1,codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc);
+            videProj += lsh(1,codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc,-1);
         }
         sum[i] = videCam + videProj;
         printf("\n sum[%d] = %d \n", i, sum[i]);
@@ -848,18 +998,20 @@ void leopard::makeLUT(cv::Mat &lut,int cam) {
 // output une image pour le match (imager w x h) vers une image ww x hh
 void leopard::match2image(cv::Mat &lut,minfo *match,unsigned char *mask,int w,int h,int ww,int hh) {
     lut.create(h,w,CV_16UC3);
-    int x,y,xx,yy,cc;
+    int x,y,xx,yy,cc,dxx,dyy;
     int i=0;
     for(y=0;y<h;y++) for(x=0;x<w;x++) {
         i=y*w+x;
         xx=match[i].idx%ww;
         yy=match[i].idx/ww;
         cc=match[i].cost;
+        dxx=(int) (match[i].subpx*65535);
+        dyy=(int) (match[i].subpy*65535);
         //lut->at<Vec3s>(y,x)=Vec3s((xx*65535)/ww,(yy*65535)/hh,(cc*65535)/maxcost);
         if( mask[i]==0 ) {
             lut.at<Vec3s>(y,x)=Vec3s( 0, 0, 0);
         }else{
-            lut.at<Vec3s>(y,x)=Vec3s( (cc*65535)/nbb, (yy*65535)/hh, (xx*65535)/ww);
+            lut.at<Vec3s>(y,x)=Vec3s((cc*65535)/nbb, (yy*65535+dyy)/hh, (xx*65535+dxx)/ww);
         }
     }
 }

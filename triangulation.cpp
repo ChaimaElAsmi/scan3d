@@ -4,10 +4,11 @@
 #include <unistd.h>
 #include <stdio.h>
 
-
+#include <triangulation.hpp>
 
 using namespace cv;
 using namespace std;
+
 
 int initMat(string file, Mat &internes, Mat &rotation, Mat &translation, Mat &distCoeffs) {
 
@@ -70,30 +71,27 @@ int matrixCorr(Mat &pointsLut, Mat &pointsCorr, Mat lutSrc, Mat lutDst) {
     cout << "LutSrc(r,c)  " << lutSrc_r << "  " << lutSrc_c << endl;
     cout << "LutDst(r,c)  " << lutDst_r << "  " << lutDst_c << endl;
 
-//    unsigned short *p = (unsigned short*) lutSrc.data;
-//    unsigned short *q;
-    double *p = (double*) lutSrc.data;
-    double *q;
+
+    unsigned short *p = (unsigned short*) lutSrc.data;
+    unsigned short *q;
     Mat mask = Mat::zeros(lutSrc_r, lutSrc_c, CV_8UC1);
     int n=0;
-
     for(int r=0; r<lutSrc_r; r++) {
         for(int c=0; c<lutSrc_c; c++) {
             q = p+(r*lutSrc_c+c)*3;
-            //printf("%f  %f  %f \n", q[0], q[1],q[3]);
-            float f = /*(float)*/ q[0]/65535; //pourcentage d'erreur
-//            if(f > 0.3)
-//                printf("f = %f \n", f);
+            //printf("%d  %d  %d \n", q[0], q[1],q[2]);
+            float f = (float)q[0]/65535; //pourcentage d'erreur
+//            if(f > 0.5)
+            //printf("f = %f \n", f);
             if((q[0]==0) || (f>0.2)) continue;
             //if((r%10)!=0 || (c%10)!=0) continue; //pour avoir un seul point
             mask.at<uchar>(r, c) = 255;
             n++;
         }
     }
-
     cout << endl << n << " pixels sélectionnés!" << endl;
 
-    imwrite("/home/chaima/Documents/scanGit/scan3d/triangulation/nuagePoints/mask/visage/mask_vis.png", mask);
+    imwrite("/home/chaima/Documents/scanGit/scan3d/triangulation/nuagePoints/mask/visage/mask_visSp.png", mask);
 
     pointsLut = Mat::zeros(2, n, CV_64F);
     pointsCorr = Mat::zeros(2, n, CV_64F);
@@ -105,12 +103,12 @@ int matrixCorr(Mat &pointsLut, Mat &pointsCorr, Mat lutSrc, Mat lutDst) {
 
             q = p+(r*lutSrc_c+c)*3;
             //printf("%d  %d  %d \n", q[0], q[1],q[3]);
-            pointsLut.at<double>(0,n) = c;
-            pointsLut.at<double>(1,n) = r;
-            pointsCorr.at<double>(0,n) = (/*(double)*/ q[2]*lutDst_c)/65535;
-            pointsCorr.at<double>(1,n) = (/*(double)*/ q[1]*lutDst_r)/65535;
-//            printf("(%f, %f) -> (%f, %f) \n",pointsLut.at<double>(0,n),pointsLut.at<double>(1,n),
-//                                             pointsCorr.at<double>(0,n),pointsCorr.at<double>(1,n));
+            pointsLut.at<double>(0,n) = c/1920.0*640.0;//TEST
+            pointsLut.at<double>(1,n) = r/1080.0*480.0;
+            pointsCorr.at<double>(0,n) = ((double)q[2]*lutDst_c)/65535;
+            pointsCorr.at<double>(1,n) = ((double)q[1]*lutDst_r)/65535;
+            printf("(%f, %f) -> (%f, %f) \n",pointsLut.at<double>(0,n),pointsLut.at<double>(1,n),
+                                             pointsCorr.at<double>(0,n),pointsCorr.at<double>(1,n));
             n++;
         }
     }
@@ -136,24 +134,22 @@ void undistortMatrix(Mat &pointsOutput, Mat pointsInput, Mat internes, Mat distC
     undistortPoints(points1D, pointsOutput, internes, distCoeffs);
     double *r = (double*) pointsOutput.data;
 
-//    for(int i=0; i<pointsInputTr.rows;i++)
-//    cout  << q[0+i*2] << ", " << q[1+i*2] << "  ->  " << r[0+i*2] << " , " << r[1+i*2] << endl;
-    //Affichage d'un seul point
-    cout  << q[0+500*2] << ", " << q[1+500*2] << "  ->  " << r[0+500*2] << " , " << r[1+500*2] << endl;
+    for(int i=0; i<pointsInputTr.rows;i++)
+    cout  << q[0+i*2] << ", " << q[1+i*2] << "  ->  " << r[0+i*2] << " , " << r[1+i*2] << endl;
 }
 
-int lut2corr(String nameSrc, Mat internesSrc, Mat distCoeffsSrc, Mat &pointsUndSrc,
-         String nameDst, Mat internesDst, Mat distCoeffsDst, Mat &pointsUndDst) {
+int lut2corr(Mat lutSrc, Mat internesSrc, Mat distCoeffsSrc, Mat &pointsUndSrc,
+         Mat lutDst, Mat internesDst, Mat distCoeffsDst, Mat &pointsUndDst) {
 
     //Lecture de la LUT de la caméra et du projecteur
-    String filename = "/home/chaima/Documents/scanGit/scan3d/calibration/LUT/visage/";
-    Mat lutSrc = imread(filename + nameSrc, CV_LOAD_IMAGE_UNCHANGED);
-    Mat lutDst  = imread(filename + nameDst, CV_LOAD_IMAGE_UNCHANGED);
+//    string filename = "/home/chaima/Documents/scanGit/scan3d/calibration/LUT/objet/";
+//    Mat lutSrc = imread(filename + nameSrc, CV_LOAD_IMAGE_UNCHANGED);
+//    Mat lutDst  = imread(filename + nameDst, CV_LOAD_IMAGE_UNCHANGED);
 
 //    namedWindow("Display LUT", 1);
 //    imshow("Display LUT", lutSrc);
 //    waitKey(0);
-//    imshow("Display LUT", lutDst);
+//    imshow("Display LUT", lutcam);
 //    waitKey(0);
 
 
@@ -181,7 +177,7 @@ int lut2corr(String nameSrc, Mat internesSrc, Mat distCoeffsSrc, Mat &pointsUndS
 
 int saveMat(Mat point4D) {
 
-    string filenameS = "/home/chaima/Documents/scanGit/scan3d/triangulation/nuagePoints/out/visage/out_vis.xml";
+    string filenameS = "/home/chaima/Documents/scanGit/scan3d/triangulation/nuagePoints/out/visage/out_visSp.xml";
     FileStorage fsS(filenameS, FileStorage::WRITE);
     if(!fsS.isOpened()) {
         cout << "Erreur! Le fichier Save n'est pas ouvert! \n" << endl;
@@ -196,10 +192,11 @@ int saveMat(Mat point4D) {
 }
 
 
-int main(int argc, char *argv[])
-{
+void triangulate(Mat lutCam, Mat lutProj) {
+    cout << "----- Triangulation -----" << endl;
+
     //Projecteur
-    String fileProj = "out_projector_data.xml";
+    string fileProj = "out_projector_data.xml";
     Mat int_proj;
     Mat rot_proj;
     Mat trans_proj;
@@ -228,7 +225,7 @@ int main(int argc, char *argv[])
 
 
     //Cameras
-    String fileCam = "out_camera_data.xml";
+    string fileCam = "out_camera_data.xml";
     Mat int_cam;
     Mat rot_cam;
     Mat trans_cam;
@@ -258,8 +255,8 @@ int main(int argc, char *argv[])
 
 
     //Init
-    String nameProj  = "lutproj_vis.png";
-    String nameCam  = "lutcam_vis.png";
+//    string nameProj  = "lutproj_200.png";
+//    string nameCam  = "lutcam_200.png";
 
     Mat pointsUndLut;
     Mat pointsUndCorr;
@@ -276,8 +273,8 @@ int main(int argc, char *argv[])
 
     /*----------------------------- Cam -> Proj -----------------------------*/
     //Triangulation
-    size = lut2corr(nameCam,  int_cam,  distCoeffs_cam,  pointsUndLut,
-               nameProj, int_proj, distCoeffs_proj, pointsUndCorr);
+    size = lut2corr(lutCam,  int_cam,  distCoeffs_cam,  pointsUndLut,
+               lutProj, int_proj, distCoeffs_proj, pointsUndCorr);
 
     point4D = Mat::zeros(4, size, CV_64F);
     triangulatePoints(poseMatrixCam, poseMatrixProj, pointsUndLut, pointsUndCorr, point4D);
@@ -291,27 +288,20 @@ int main(int argc, char *argv[])
 
     cout << point4D.rows << "    " << point4D.cols << endl;
 
-//    double w, x, y, z;
-//    for(int c=0; c<point4D.cols; c++) {
+    double w, x, y, z;
+    for(int c=0; c<point4D.cols; c++) {
 
-//        w = point4D.at<double>(3,c);
-//        x = point4D.at<double>(0,c)/w;
-//        y = point4D.at<double>(1,c)/w;
-//        z = point4D.at<double>(2,c)/w;
+        w = point4D.at<double>(3,c);
+        x = point4D.at<double>(0,c)/w;
+        y = point4D.at<double>(1,c)/w;
+        z = point4D.at<double>(2,c)/w;
 
-//        cout << x << ", " << y << ", " << z << endl;
-//    }
-
-    //Affichage d'un seul point
-    cout << point4D.at<double>(0,500) << ", " << point4D.at<double>(1,500)
-         << ", " << point4D.at<double>(2,500) << endl;
+        cout << x << ", " << y << ", " << z << endl;
+    }
 
     //Save
     saveMat(point4D);
 
     cout << endl;
     cout << "----- Triangulation Done -----" << endl;
-
-    return 0;
 }
-

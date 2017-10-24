@@ -12,3 +12,5 @@ LIBS += -L/usr/local/lib -lopencv_core  -lopencv_highgui -lopencv_photo -lopencv
 
 SOURCES += main.cpp
 
+HEADERS +=
+

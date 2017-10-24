@@ -5,6 +5,7 @@
 
 
 #include <leopard.hpp>
+#include <triangulation.hpp>
 
 
 using namespace cv;
@@ -33,14 +34,14 @@ void testLeopardSeb() {
     /// lire des images
     int nb=40;
     Mat *imagesCam;
-    imagesCam=L->readImages((char *)"data/cam1/cam%03d.jpg",0,nb-1,0);
+    imagesCam=L->readImages((char *)"data/cam1/cam%03d.jpg",0,nb-1, -1.0);
     L->computeMask(1,imagesCam,nb,1.45,5.0,1,0,0);
     //L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
     L->computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
     delete[] imagesCam;
 
     Mat *imagesProj;
-    imagesProj=L->readImages((char *)"data/proj1/leopard_2560_1080_32B_%03d.jpg",0,nb-1,0);
+    imagesProj=L->readImages((char *)"data/proj1/leopard_2560_1080_32B_%03d.jpg",0,nb-1, -1.0);
     L->computeMask(0,imagesProj,nb,1.45,5.0,1,0,0);
     //L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
     L->computeCodes(0,LEOPARD_QUADRATIC,imagesProj);
@@ -99,7 +100,7 @@ Mat* souspixelsImage(Mat* source, int n, float f,int horiz) {
 }
 
 
-void testLeopardChaima() {
+void testLeopardChaima(string nameCam, string nameProj, Mat *imgCam, Mat &lutCam, Mat &lutProj) {
     printf("----- test leopard chaima -----\n");
 
 
@@ -109,41 +110,28 @@ void testLeopardChaima() {
     printf("sizeof long %d\n",(int)sizeof(long));
     printf("sizeof long long %d\n",(int)sizeof(long long));
 
-    //////////////////
-    /// \brief Choix de data
-    ///
-    int cam = 2;
-    string nameCam, nameProj;
-    if(cam == 1) {
-        nameCam  = "data/cam1/cam%03d.jpg";
-        nameProj = "data/proj1/leopard_2560_1080_32B_%03d.jpg";
-    }
-    else {
-        nameCam  = "data/objet/images_240/cam_%04d.jpg";
-        nameProj = "/home/chaima/Documents/Mathematica/Images/1280x720/Patterns_240/leopard_1280_720_%04d.jpg";
-    }
-    //////////////////
-
     double timeS = horloge();
 
     leopard *L=new leopard();
-    int nb = 240;
-    int from = 20;
+    int nb = 60;
+    int from = 0;//20;
     //Camera: Images / Code simple
     Mat *imagesCam;
-    imagesCam = L->readImages((char *) nameCam.c_str(), from, from+nb-1, 0);
+    imagesCam = L->readImages((char *) nameCam.c_str(), from, from+nb-1, -1.0);
+    //Auto
+//    imagesCam = L->readImages2(imgCam, from, from+nb-1);
     L->computeMask(1,imagesCam,nb,0.45,5.0,1,0,0);
     L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
 
     //Projecteur: Images / Code simple
     Mat *imagesProj;
-    imagesProj=L->readImages((char *) nameProj.c_str(), 0, nb-1, 0);
+    imagesProj=L->readImages((char *) nameProj.c_str(), 0, nb-1, -1.0);
     L->computeMask(0,imagesProj,nb,1,5.0,1,0,0);
     L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
 
 
     //Souspixels
-//    Mat *imagesProjSP;
+    Mat *imagesProjSP;
 //    imagesProjSP = souspixelsImage(imagesProj, nb, 0.5, 0);
 //    Mat *imagesProjSPxy;
 //    imagesProjSPxy = souspixelsImage(imagesProjSP, nb, 0.5, 1);
@@ -164,8 +152,6 @@ void testLeopardChaima() {
 
     //Cherche le mix des images du projecteur
     Mat *imagesProjMix=new Mat[nb];
-    Mat lutCam;
-    Mat lutProj;
     int sumCostS=0, sumCostP=0;
 
     //Match avec l'image suivante
@@ -175,8 +161,8 @@ void testLeopardChaima() {
     imagesProjMix[nb-1] = imagesProj[nb-1];
 
     //QUAD
-    L->computeCodes(1,LEOPARD_SIMPLE,imagesCamDecal);
-    L->computeCodes(0,LEOPARD_SIMPLE,imagesProjMix);
+    L->computeCodes(1,LEOPARD_QUADRATIC,imagesCamDecal);
+    L->computeCodes(0,LEOPARD_QUADRATIC,imagesProjMix);
 
     for(int j=0; j<10; j++)
         L->doLsh();
@@ -190,8 +176,8 @@ void testLeopardChaima() {
     imagesProjMix[0] = imagesProj[0];
 
     //QUAD
-    L->computeCodes(1,LEOPARD_SIMPLE,imagesCamDecal);
-    L->computeCodes(0,LEOPARD_SIMPLE,imagesProjMix);
+    L->computeCodes(1,LEOPARD_QUADRATIC,imagesCamDecal);
+    L->computeCodes(0,LEOPARD_QUADRATIC,imagesProjMix);
 
     for(int j=0; j<10; j++)
         L->doLsh();
@@ -201,7 +187,6 @@ void testLeopardChaima() {
     printf("\n sumSuivante = %d, sumPrécédente = %d \n",sumCostS, sumCostP);
 
     //Test Souspixels
-    Mat *imagesProjSP;
     float k=0;
 //    while(k < 1) {
 //        printf("\n\n\n\n--------------------------------------------");
@@ -209,9 +194,11 @@ void testLeopardChaima() {
         imagesProjSP = souspixelsImage(imagesProj, nb, k, 0);
 
     //Choix du mix
+    L->prepareMatch();
     if(sumCostS < sumCostP) {
         printf("\n match avec la suivante ! \n");
         for(double fct=0; fct<=1; fct+=0.3) {
+            //fct=0.9;
             printf("\n\n---------------------- facteur = %.2f ----------------------\n\n", fct);
 
             for(int i=0; i<nb-1; i++)
@@ -219,10 +206,10 @@ void testLeopardChaima() {
             imagesProjMix[nb-1] = imagesProjSP[nb-1];
 
             //QUAD
-            L->computeCodes(1,LEOPARD_SIMPLE,imagesCamDecal);
-            L->computeCodes(0,LEOPARD_SIMPLE,imagesProjMix);
+            L->computeCodes(1,LEOPARD_QUADRATIC,imagesCamDecal);
+            L->computeCodes(0,LEOPARD_QUADRATIC,imagesProjMix);
 
-            //TEST
+            //TEST: pas de cumul
             //L->prepareMatch();
             for(int j=0; j<10; j++)
                 L->doLsh();
@@ -232,11 +219,13 @@ void testLeopardChaima() {
 
             //imwrite(format("lsh/mix/cumul2/lutcam_%.2f.png", fct),lutCam);
             //imwrite(format("lsh/mix/cumul2/lutproj_%.2f.png", fct),lutProj);
+            //break; //Temporaire!
         }
     }
     else {
         printf("\n match avec la précédente ! \n");
         for(double fct=0; fct<=1; fct+=0.3) {
+            //fct=0.9;
             printf("\n\n---------------------- facteur = %.2f ----------------------\n\n", fct);
 
             for(int i=nb-1; i>0; i--)
@@ -244,10 +233,10 @@ void testLeopardChaima() {
             imagesProjMix[0] = imagesProjSP[0];
 
             //QUAD
-            L->computeCodes(1,LEOPARD_SIMPLE,imagesCamDecal);
-            L->computeCodes(0,LEOPARD_SIMPLE,imagesProjMix);
+            L->computeCodes(1,LEOPARD_QUADRATIC,imagesCamDecal);
+            L->computeCodes(0,LEOPARD_QUADRATIC,imagesProjMix);
 
-            //TEST
+            //TEST: pas de cumul
             //L->prepareMatch();
             for(int j=0; j<10; j++)
                 L->doLsh();
@@ -257,6 +246,7 @@ void testLeopardChaima() {
 
             //imwrite(format("lsh/mix/cumul2/lutcam_%.2f.png", fct),lutCam);
             //imwrite(format("lsh/mix/cumul2/lutproj_%.2f.png", fct),lutProj);
+            //break; //Temporaire!
         }
     }
 
@@ -264,8 +254,8 @@ void testLeopardChaima() {
 
     L->makeLUT(lutCam,1);
     L->makeLUT(lutProj,0);
-    imwrite("calibration/LUT/objet/lutcam_T.png",lutCam);
-    imwrite("calibration/LUT/objet/lutproj_T.png",lutProj);
+    imwrite("calibration/LUT/visage/lutcam_vis.png",lutCam);
+    imwrite("calibration/LUT/visage/lutproj_vis.png",lutProj);
 
 //    imwrite(format("lsh/SP/objet_60Y/lutcam_%.2f.png", k),lutCam);
 //    imwrite(format("lsh/SP/objet_60Y/lutproj_%.2f.png", k),lutProj);
@@ -282,88 +272,120 @@ void testLeopardChaima() {
     delete[] imagesProj;
     delete[] imagesProjMix;
     delete L;
-    printf("----- done -----\n");
+    printf("----- leopard done -----\n");
 }
 
 
 int main(int argc, char *argv[]) {
 
+    int capture   = 0;
+    int scan      = 1;
+    int triangule = 0;
+
+
     int nbImages = 300;
     Mat img[nbImages];
 
-    char *user=getenv("USER");
-    printf("Usager %s\n",user);
-
-    // options
-    for(int i=1;i<argc;i++) {
-		if( strcmp("-h",argv[i])==0 ) {
-			printf("Usage: %s -h\n",argv[0]);
-			exit(0);
-		}
+    //Choix des datas
+    int cam = 2;
+    string nameCam, nameProj;
+    Mat lutCam;
+    Mat lutProj;
+    if(cam == 1) {
+        nameCam  = "data/cam1/cam%03d.jpg";
+        nameProj = "data/proj1/leopard_2560_1080_32B_%03d.jpg";
+    }
+    else {
+        nameCam  = "data/test/cam_%04d.jpg";
+                //"data/objetplanaire/cam_%04d.jpg";
+                //"/home/chaima/Documents/Mathematica/Images/1280x720/Patterns_60/"
+                  // "/pat_modif/leopardModif_1280_720_%04d.jpg";
+        //"data/objet/images_60/cam_%04d.jpg";
+        //"data/test/cam_%04d.jpg";
+        nameProj = "/home/chaima/Documents/Mathematica/Images/1280x720/Patterns_60/leopard_1280_720_%04d.jpg";
     }
 
 
-    if( strcmp(user,"roys")==0 ) {
-        testLeopardSeb();
-    }else if( strcmp(user,"chaima")==0 ) {
-        testLeopardChaima();
+    /* ----------------------- Capture ----------------------- */
+    if(capture) {
+
+        printf("----- Capture -----\n");
+
+        VideoCapture cap(1);
+
+        for(int i = 0; i < 30; i++)
+            cap >> img[0]; //Démarrer la caméra
+
+        if(!cap.isOpened()) {
+            cout << "Camera error" << endl;
+            return -1;
+        }
+        else {
+            cout << "Camera ready" << endl;
+        }
+
+        srand(time(NULL));
+        int random = rand() % 500000;
+        cout << "random : " << random << endl;
+        usleep(random);
+
+        double timeS = horloge();
+        for(int i = 0; i < nbImages; i++) {
+            cap >> img[i];
+            //resize(img[i], resized[i], Size(640,480)); //(683,384)
+        }
+        double timeE = horloge();
+
+        cout << "Time : " << (timeE - timeS) / nbImages << endl;
+        cout << "Time (" << nbImages << " images): " << (timeE - timeS) << endl;
+        waitKey(0);
+
+        namedWindow("Display Image", 1);
+        //Changer la fenetre d'affichage
+    //    resizeWindow("Display Image", 800, 600);
+    //    moveWindow("Display Image", 1366, 0);
+
+        for(int i = 0; i < nbImages; i++) {
+            imwrite( format(nameCam.c_str(), i), img[i] );
+            imshow("Display Image", img[i]);
+            waitKey(30);
+        }
+
+        printf("----- Capture done -----\n");
+        printf("\n\n");
     }
 
+    /* ----------------------- Scan 3D ----------------------- */
+    if(scan) {
+        char *user=getenv("USER");
+        printf("Usager %s\n",user);
+        printf("\n\n");
 
-    exit(0);
 
-    VideoCapture cap(1);
+        // options
+        for(int i=1;i<argc;i++) {
+            if( strcmp("-h",argv[i])==0 ) {
+                printf("Usage: %s -h\n",argv[0]);
+                exit(0);
+            }
+        }
 
-    for(int i = 0; i < 30; i++)
-        cap >> img[0]; //Démarrer la caméra
-
-    cout << "Pres" << endl;
-    waitKey(0);
-
-    if(!cap.isOpened())
-        return -1;
-
-    //Video vlc monitor screen
-    //system("vlc --qt-fullscreen-screennumber=1 -f
-      //     '/home/chaima/Documents/Mathematica/Video/sequence5_32.mp4' "
-      //     "--play-and-exit --no-video-title-show --aspect-ratio 4:3 &");
-    //Video vlc default screen
-    // system("vlc '/home/chaima/Documents/Mathematica/Video/sequence3.mp4' "
-       //     "-f --play-and-exit --no-video-title-show &");
-    //Vidéo mplayer
-    //system("mplayer '/home/chaima/Documents/Mathematica/Video/sequence3.mp4' "
-      //     "-geometry 800x600+1366+0 -noborder -aspect 4:3 &");
-
-    srand(time(NULL));
-    int random = rand() % 500000;
-    cout << "random : " << random << endl;
-    usleep(random);
-
-    double timeS = horloge();
-    for(int i = 0; i < nbImages; i++) {
-        cap >> img[i];
-        //resize(img[i], resized[i], Size(640,480)); //(683,384)
+        if( strcmp(user,"roys")==0 ) {
+            testLeopardSeb();
+        }else if( strcmp(user,"chaima")==0 ) {
+            testLeopardChaima(nameCam, nameProj, img, lutCam, lutProj);
+        }
     }
-    double timeE = horloge();
+    else {
+        printf("----- Pas de capture -----\n");
 
-    cout << "Time : " << (timeE - timeS) / nbImages << endl;
-    cout << "Time (" << nbImages << " images): " << (timeE - timeS) << endl;
-    waitKey(0);
+        lutCam  = imread("calibration/LUT/visage/lutcam_vis.png", CV_LOAD_IMAGE_UNCHANGED);
+        lutProj =  imread("calibration/LUT/visage/lutproj_vis.png", CV_LOAD_IMAGE_UNCHANGED);
+    }
 
-    namedWindow("Display Image", 1);
-    //Changer la fenetre d'affichage
-    /*resizeWindow("Display Image", 800, 600);
-    moveWindow("Display Image", 1366, 0);*/
-
-    for(int i = 0; i < nbImages; i++) {
-        //imwrite( format("/home/chaima/Documents/Workspace/CaptureVid2/Images/Seq4/tests/test%d"
-                      //  "/image_%04d.jpg", (j + 1), i) , img[i] );
-
-        imwrite( format("/home/chaima/Documents/scanGit/scan3d/data/objet/images_240/cam_%03d.jpg",
-                          i), img[i] );
-
-        imshow("Display Image", img[i]);
-        waitKey(30);
+    /* ----------------------- Triangulation ----------------------- */
+    if(triangule) {
+        triangulate(lutCam, lutProj);
     }
 
     return 0;

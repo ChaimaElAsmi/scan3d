@@ -10,6 +10,8 @@ class minfo {
 	public:
 	int idx; // index du match dans l'autre image  idx=y*w+x,  y=idx/w, x=idx%w
 	unsigned short cost; // cout du match
+    float subpx; // souspixels en x
+    float subpy; // souspixels en y
 	//unsigned short active; // 1 = try to find this match, 0 = do not compute this match.
 };
 
@@ -59,15 +61,24 @@ class leopard {
 	cv::Mat minCam,maxCam;
 	cv::Mat minProj,maxProj;
 
+    //SousPixels
+    int wDecal = 5;
+    int *ptsCam,*ptsProj;
+
     public:
 	leopard(); //int w,int h, int nb, int freq, bool blur,string pid);
 	~leopard();
 
-    cv::Mat *readImages(char *name,int from,int to, int decal);
+    cv::Mat *readImages(char *name, int from, int to, double fct);
+    cv::Mat *readImages2(cv::Mat *cam, int from, int to);
     void computeMask(int cam,cv::Mat *img,int nb,double seuil,double bias,int step,int offx,int offy);
     void computeCodes(int cam,int type,cv::Mat *img);
     void prepareMatch();
 	void forceBrute();
+    void sousPixels();
+    void unSousPixels(int i);
+    void initSP();
+    void unInitSP();
     void makeLUT(cv::Mat &lut,int cam);
     int doLsh();
     int doHeuristique();
@@ -84,8 +95,8 @@ class leopard {
     int bitCount(unsigned long n);
 	void match2image(cv::Mat &lut,minfo *match,unsigned char *mask,int w,int h,int ww,int hh);
 
-	int lsh( int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
-					 unsigned long *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb);
+    int lsh(int dir, unsigned long *codeA, minfo *matchA, unsigned char *maskA, int wa, int ha,
+                     unsigned long *codeB, minfo *matchB, unsigned char *maskB, int wb, int hb, int aisCam);
 	int heuristique( unsigned long *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
 					 unsigned long *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb);
 
