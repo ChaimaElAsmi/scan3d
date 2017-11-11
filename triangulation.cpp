@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include <triangulation.hpp>
+#include <paths.hpp>
 
 using namespace cv;
 using namespace std;
@@ -17,8 +18,7 @@ int initMat(string file, Mat &internes, Mat &rotation, Mat &translation, Mat &di
     translation = Mat::zeros(3, 1, CV_64F);
     distCoeffs = Mat::zeros(5, 1, CV_64F);
 
-    string filenameI = "/home/chaima/Documents/scanGit/scan3d/calibration/" + file;
-    FileStorage fsI(filenameI, FileStorage::READ);
+    FileStorage fsI(file, FileStorage::READ);
     if(!fsI.isOpened()) {
         cout << "Erreur! Le fichier Init n'est pas ouvert! \n" << endl;
         return -1;
@@ -91,7 +91,7 @@ int matrixCorr(Mat &pointsLut, Mat &pointsCorr, Mat lutSrc, Mat lutDst) {
     }
     cout << endl << n << " pixels sélectionnés!" << endl;
 
-    imwrite("/home/chaima/Documents/scanGit/scan3d/triangulation/nuagePoints/mask/visage/mask_visSp.png", mask);
+    imwrite(FN_TR_MASK, mask);
 
     pointsLut = Mat::zeros(2, n, CV_64F);
     pointsCorr = Mat::zeros(2, n, CV_64F);
@@ -103,8 +103,8 @@ int matrixCorr(Mat &pointsLut, Mat &pointsCorr, Mat lutSrc, Mat lutDst) {
 
             q = p+(r*lutSrc_c+c)*3;
             //printf("%d  %d  %d \n", q[0], q[1],q[3]);
-            pointsLut.at<double>(0,n) = c/1920.0*640.0;//TEST
-            pointsLut.at<double>(1,n) = r/1080.0*480.0;
+            pointsLut.at<double>(0,n) = c; // /1920.0*640.0;//TEST
+            pointsLut.at<double>(1,n) = r; // /1080.0*480.0;
             pointsCorr.at<double>(0,n) = ((double)q[2]*lutDst_c)/65535;
             pointsCorr.at<double>(1,n) = ((double)q[1]*lutDst_r)/65535;
             printf("(%f, %f) -> (%f, %f) \n",pointsLut.at<double>(0,n),pointsLut.at<double>(1,n),
@@ -141,18 +141,6 @@ void undistortMatrix(Mat &pointsOutput, Mat pointsInput, Mat internes, Mat distC
 int lut2corr(Mat lutSrc, Mat internesSrc, Mat distCoeffsSrc, Mat &pointsUndSrc,
          Mat lutDst, Mat internesDst, Mat distCoeffsDst, Mat &pointsUndDst) {
 
-    //Lecture de la LUT de la caméra et du projecteur
-//    string filename = "/home/chaima/Documents/scanGit/scan3d/calibration/LUT/objet/";
-//    Mat lutSrc = imread(filename + nameSrc, CV_LOAD_IMAGE_UNCHANGED);
-//    Mat lutDst  = imread(filename + nameDst, CV_LOAD_IMAGE_UNCHANGED);
-
-//    namedWindow("Display LUT", 1);
-//    imshow("Display LUT", lutSrc);
-//    waitKey(0);
-//    imshow("Display LUT", lutcam);
-//    waitKey(0);
-
-
     Mat pointsSrc;
     Mat pointsDst;
     cout << endl << endl;
@@ -177,7 +165,7 @@ int lut2corr(Mat lutSrc, Mat internesSrc, Mat distCoeffsSrc, Mat &pointsUndSrc,
 
 int saveMat(Mat point4D) {
 
-    string filenameS = "/home/chaima/Documents/scanGit/scan3d/triangulation/nuagePoints/out/visage/out_visSp.xml";
+    string filenameS = FN_TR_DATA;
     FileStorage fsS(filenameS, FileStorage::WRITE);
     if(!fsS.isOpened()) {
         cout << "Erreur! Le fichier Save n'est pas ouvert! \n" << endl;
@@ -196,7 +184,7 @@ void triangulate(Mat lutCam, Mat lutProj) {
     cout << "----- Triangulation -----" << endl;
 
     //Projecteur
-    string fileProj = "out_projector_data.xml";
+    string fileProj = FN_TR_PPROJ;
     Mat int_proj;
     Mat rot_proj;
     Mat trans_proj;
@@ -225,7 +213,7 @@ void triangulate(Mat lutCam, Mat lutProj) {
 
 
     //Cameras
-    string fileCam = "out_camera_data.xml";
+    string fileCam = FN_TR_PCAM;
     Mat int_cam;
     Mat rot_cam;
     Mat trans_cam;
@@ -263,21 +251,23 @@ void triangulate(Mat lutCam, Mat lutProj) {
     Mat point4D;
     int size;
 
-    /*----------------------------- Proj -> Cam -----------------------------*/
     //Triangulation
-//    size = lut2corr(nameProj, int_proj, distCoeffs_proj, pointsUndLut,
-//               nameCam,  int_cam,  distCoeffs_cam,  pointsUndCorr);
+    if(TR_CAM) {
+        /* Cam -> Proj */
+        size = lut2corr(lutCam,  int_cam,  distCoeffs_cam,  pointsUndLut,
+                   lutProj, int_proj, distCoeffs_proj, pointsUndCorr);
 
-//    point4D = Mat::zeros(4, size, CV_64F);
-//    triangulatePoints(poseMatrixProj, poseMatrixCam, pointsUndLut, pointsUndCorr, point4D);
+        point4D = Mat::zeros(4, size, CV_64F);
+        triangulatePoints(poseMatrixCam, poseMatrixProj, pointsUndLut, pointsUndCorr, point4D);
+    }
+    else {
+        /* Proj -> Cam */
+        size = lut2corr(lutProj, int_proj, distCoeffs_proj, pointsUndLut,
+                   lutCam,  int_cam,  distCoeffs_cam,  pointsUndCorr);
 
-    /*----------------------------- Cam -> Proj -----------------------------*/
-    //Triangulation
-    size = lut2corr(lutCam,  int_cam,  distCoeffs_cam,  pointsUndLut,
-               lutProj, int_proj, distCoeffs_proj, pointsUndCorr);
-
-    point4D = Mat::zeros(4, size, CV_64F);
-    triangulatePoints(poseMatrixCam, poseMatrixProj, pointsUndLut, pointsUndCorr, point4D);
+        point4D = Mat::zeros(4, size, CV_64F);
+        triangulatePoints(poseMatrixProj, poseMatrixCam, pointsUndLut, pointsUndCorr, point4D);
+    }
 
     //Display Coordinates
     cout << endl << endl;

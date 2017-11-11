@@ -80,7 +80,7 @@ class leopard {
     void initSP();
     void unInitSP();
     void makeLUT(cv::Mat &lut,int cam);
-    int doLsh();
+    int doLsh(int sp);
     int doHeuristique();
     int doShiftCodes();
     int sumCost();

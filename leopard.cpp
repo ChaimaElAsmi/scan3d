@@ -1,5 +1,6 @@
 #include <fstream>
 #include <leopard.hpp>
+#include <paths.hpp>
 
 #include <sys/time.h>
 
@@ -260,7 +261,8 @@ void leopard::computeMask(int cam,cv::Mat *img,int nb,double seuil,double bias,i
         n=nb;
 	}
 
-    /*
+
+     /*
     imwrite("mean.png",mean);
     imwrite("std.png",std);
     imwrite("bimod.png",bimod);
@@ -268,10 +270,14 @@ void leopard::computeMask(int cam,cv::Mat *img,int nb,double seuil,double bias,i
     imwrite("min.png",min);
     imwrite("max.png",max);
     */
-    if (cam)
-        imwrite("maskCam.png",mask);
-    else
-        imwrite("maskProj.png", mask);
+
+    if (cam) {
+        imwrite(FN_SCAN_MASKC,mask);
+        imwrite(FN_SCAN_MEANC,mean);
+    }
+    else {
+        imwrite(FN_SCAN_MASKP, mask);
+    }
 }
 
 
@@ -539,58 +545,47 @@ void leopard::unInitSP(){
 //sousPixels pour le pixel i de la caméra
 //le point de départ caméra est un entier et le point d'arrivée projecteur est en sp
 void leopard::unSousPixels(int i) {
-    double t1=horloge();
-    //int step=wc*hc/100;
 
-    //for(int i=0; i<wc*hc; i++) {
-//        i=300*wc+300;
-//        int ix = i%wc;
-//        if((ix<10) || (ix>=wc-10)) continue;
-        if( i%wc==0 ) printf("%d\n",i/wc);
-        if( maskCam[i]==0 ) return;
-        int j = matchCam[i].idx;
-        int jy = j/wp;
-        int jx = j%wp;
-        if((jx<wDecal) || (jx>=wp-wDecal)) return;
-        if((jy<wDecal) || (jy>=hp-wDecal)) return;
-        //printf("i = %d, j = %d\n", i, j);
+    if( i%wc==0 ) printf("%d\n",i/wc);
+    if( maskCam[i]==0 ) return;
+    int j = matchCam[i].idx;
+    int jy = j/wp;
+    int jx = j%wp;
+    if((jx<wDecal) || (jx>=wp-wDecal)) return;
+    if((jy<wDecal) || (jy>=hp-wDecal)) return;
+    //printf("i = %d, j = %d\n", i, j);
 
-        int pos = 0;
-        for(int dr=-wDecal; dr<=wDecal; dr++)
-            for(int dc=-wDecal; dc<=wDecal; dc++, pos++) {
+    int pos = 0;
+    for(int dr=-wDecal; dr<=wDecal; dr++)
+        for(int dc=-wDecal; dc<=wDecal; dc++, pos++) {
 
-                int jj = j+dc+dr*wp;
-                //if( maskProj[jj]==0 ) continue;
-                int c1  = cost(codeCam+i*nb,codeProj+jj*nb);
-                int c2 = cost(codeProj+j*nb,codeProj+jj*nb);
-                ptsCam[pos] = c1;
-                ptsProj[pos] = c2;
+            int jj = j+dc+dr*wp;
+            //if( maskProj[jj]==0 ) continue;
+            int c1  = cost(codeCam+i*nb,codeProj+jj*nb);
+            int c2 = cost(codeProj+j*nb,codeProj+jj*nb);
+            ptsCam[pos] = c1;
+            ptsProj[pos] = c2;
+        }
+
+    //choisir le shift qui minimise le cout
+    int n = 5;
+    double bestv=-1.0;
+    int bestsx=0;
+    int bestsy=0;
+    for(int sy=-(n-1);sy<n;sy++)
+        for(int sx=-(n-1);sx<n;sx++){
+            double v = align(ptsCam, ptsProj, (double) sx/n, (double) sy/n, 2*wDecal+1);
+            if(v<bestv || bestv<0){
+                bestv=v;
+                bestsx=sx;
+                bestsy=sy;
             }
+            //printf("%f \n",v);
+        }
 
-        //test un seul pixel
-        //if(i==300*wc+300) {
-        //choisir le shift qui minimise le cout
-        int n = 5;
-        double bestv=-1.0;
-        int bestsx=0;
-        int bestsy=0;
-        for(int sy=-(n-1);sy<n;sy++)
-            for(int sx=-(n-1);sx<n;sx++){
-                double v = align(ptsCam, ptsProj, (double) sx/n, (double) sy/n, 2*wDecal+1);
-                if(v<bestv || bestv<0){
-                    bestv=v;
-                    bestsx=sx;
-                    bestsy=sy;
-                }
-                //printf("%f \n",v);
-            }
+    matchCam[i].subpx = (double) bestsx/n;
+    matchCam[i].subpy = (double) bestsy/n;
 
-        //}
-        matchCam[i].subpx = (double) bestsx/n;
-        matchCam[i].subpy = (double) bestsy/n;
-    //}
-    double t2=horloge();
-    //printf("subpx temps=%12.6f\n", t2-t1);
 }
 
 void leopard::sousPixels() {
@@ -617,15 +612,18 @@ void leopard::forceBrute() {
     printf("temps=%12.6f\n",t2-t1);
 }
 
-int leopard::doLsh() {
+//sp : 1 = faire du sp
+//     0 = pas de sp
+//dans tous les cas, seulement la caméra qui a le sp
+int leopard::doLsh(int sp) {
     // de cam vers proj, dans les deux directions
     //aisCam == 1
-    lsh(0,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp,1);
-    lsh(1,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp,1);
+    lsh(0,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp,sp?1:-1);
+    lsh(1,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp,sp?1:-1);
     // de proj vers cam, dans les deux directions
     //aisCam == 0
-    lsh(0,codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc,0);
-    lsh(1,codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc,0);
+    lsh(0,codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc,sp?0:-1);
+    lsh(1,codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc,sp?0:-1);
     return 0;
 }
 

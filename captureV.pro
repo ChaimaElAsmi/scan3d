@@ -22,4 +22,5 @@ SOURCES += leopard.cpp
 
 HEADERS += \
     leopard.hpp \
-    triangulation.hpp
+    triangulation.hpp \
+    paths.hpp
