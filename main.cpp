@@ -84,9 +84,10 @@ void testLeopardSeb() {
 }
 
 
-void testLeopardChaima(string nameCam, string nameProj, string namelutC, string namelutP,
+void testLeopardChaima(string nameCam,  string nameProj,
+                       string namelutC, string namelutP,
                        string namemixC, string namemixP,
-                       Mat *imgCam, Mat &lutCam, Mat &lutProj, Mat &mixCam, Mat &mixProj, int sp) {
+                       Mat *imgCam, Mat &lutCam, Mat &lutProj, int sp) {
     printf("----- test leopard chaima -----\n");
 
 
@@ -191,6 +192,8 @@ void testLeopardChaima(string nameCam, string nameProj, string namelutC, string 
             //L->prepareMatch();
 //            for(int j=0; j<10; j++)
 //                L->doLsh(sp,(int) (fct*255));
+
+
             L->forceBrute(sp,(int) (fct*255));
         }
     }
@@ -211,12 +214,16 @@ void testLeopardChaima(string nameCam, string nameProj, string namelutC, string 
             //L->prepareMatch();
 //            for(int j=0; j<10; j++)
 //                L->doLsh(sp,(int) (fct*255));
+
+
             L->forceBrute(sp,(int) (fct*255));
         }
     }
 
     //L->forceBrute();
 
+    Mat mixCam;
+    Mat mixProj;
     L->makeLUT(lutCam,mixCam,1);
     L->makeLUT(lutProj,mixProj,0);
     imwrite(namelutC, lutCam);
@@ -226,7 +233,7 @@ void testLeopardChaima(string nameCam, string nameProj, string namelutC, string 
 
 
     double timeE = horloge();
-    printf("\n Time = %f \n", timeE-timeS);
+    printf("\n Time Scan = %f \n", timeE-timeS);
 
     delete[] imagesCam;
     delete[] imagesCamDecal;
@@ -244,13 +251,9 @@ int main(int argc, char *argv[]) {
 
     Mat lutCam;
     Mat lutProj;
-    Mat mixCam;
-    Mat mixProj;
 
     string nameCam  = FN_CAP_CAM;
     string nameProj = FN_CAP_PROJ;
-    string namemixCam  = FN_SCAN_MIXC;
-    string namemixProj = FN_SCAN_MIXP;
 
 
     // qui est l'usager??
@@ -346,8 +349,8 @@ int main(int argc, char *argv[]) {
         if( strcmp(user,"roys")==0 ) {
             testLeopardSeb();
         }else if( strcmp(user,"chaima")==0 ) {
-            testLeopardChaima(nameCam, nameProj, FN_SCAN_LUTC, FN_SCAN_LUTP,
-                              namemixCam, namemixProj, img, lutCam, lutProj, mixCam, mixProj, SP);
+            testLeopardChaima(nameCam, nameProj, FN_SCAN_LUTC, FN_SCAN_LUTP, FN_SCAN_MIXC, FN_SCAN_MIXP,
+                              img, lutCam, lutProj, SP);
         }
     }
     else {
