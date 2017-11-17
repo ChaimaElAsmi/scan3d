@@ -11,9 +11,11 @@
 */
 #define FN_CAP_CAM "subpixel/res_1920x1080/capture/freq_50/cam_%04d.jpg"
 #define FN_CAP_PROJ "../../Mathematica/Images/1280x720/Patterns_60/freq_50/leopard_1280_720_%04d.jpg"
+/*
 #define CAPTURE   0
 #define SCAN      1
 #define TRIANGULE 1
+*/
 
 
 /* Scan:

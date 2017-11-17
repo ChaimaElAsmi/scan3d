@@ -25,7 +25,6 @@ double horloge() {
 void testLeopardSeb() {
     printf("----- test leopard seb -----\n");
 
-
     printf("sizeof char %d\n",(int)sizeof(char));
     printf("sizeof short %d\n",(int)sizeof(short));
     printf("sizeof int %d\n",(int)sizeof(int));
@@ -33,29 +32,37 @@ void testLeopardSeb() {
     printf("sizeof long long %d\n",(int)sizeof(long long));
 
     leopard *L=new leopard();
+
+    // setup les output
+    L->setPath(IDX_SCAN_MASKC,"maskcam.png");
+    L->setPath(IDX_SCAN_MEANC,"meancam.png");
+    L->setPath(IDX_SCAN_MASKP,"maskproj.png");
+    L->setPath(IDX_SCAN_MEANP,"meanproj.png");
+
     /// lire des images
     int nb=40;
     Mat *imagesCam;
     imagesCam=L->readImages((char *)"data/cam1/cam%03d.jpg",0,nb-1, -1.0);
-    L->computeMask(1,imagesCam,nb,1.45,5.0,1,0,0);
-    //L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
-    L->computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
+    L->computeMask(1,imagesCam,nb,1.45,5.0,1,-1,-1,-1,-1); // toute l'image
+    L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
+    //L->computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
     delete[] imagesCam;
 
     Mat *imagesProj;
     imagesProj=L->readImages((char *)"data/proj1/leopard_2560_1080_32B_%03d.jpg",0,nb-1, -1.0);
-    L->computeMask(0,imagesProj,nb,1.45,5.0,1,0,0);
-    //L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
-    L->computeCodes(0,LEOPARD_QUADRATIC,imagesProj);
+    L->computeMask(0,imagesProj,nb,1.45,5.0,1,-1,-1,-1,-1); // toute l'image
+    L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
+    //L->computeCodes(0,LEOPARD_QUADRATIC,imagesProj);
     delete[] imagesProj;
 
     // quelques stats
-    L->statsCodes(1);
-    L->statsCodes(0);
+    //L->statsCodes(1);
+    //L->statsCodes(0);
 
     L->prepareMatch();
     //L->forceBrute();
     for(int i=0;i<20;i++) {
+        printf("--- %d ---\n",i);
         L->doLsh(0,0);
         //L->doHeuristique();
     }
@@ -92,6 +99,13 @@ void testLeopardChaima(string nameCam, string nameProj, string namelutC, string 
     double timeS = horloge();
 
     leopard *L=new leopard();
+
+    // setup les filename
+    L->setPath(IDX_SCAN_MASKC,FN_SCAN_MASKC);
+    L->setPath(IDX_SCAN_MEANC,FN_SCAN_MEANC);
+    L->setPath(IDX_SCAN_MASKP,FN_SCAN_MASKP);
+    L->setPath(IDX_SCAN_MEANP,FN_SCAN_MEANP);
+
     int nb = 60;
     int from = 100;
     //Camera: Images / Code simple
@@ -102,13 +116,13 @@ void testLeopardChaima(string nameCam, string nameProj, string namelutC, string 
     else {
         imagesCam = L->readImages((char *) nameCam.c_str(), from, from+nb-1, -1.0);
     }
-    L->computeMask(1,imagesCam,nb,0.45,5.0,1,815,815);
+    L->computeMask(1,imagesCam,nb,0.45,5.0,1,815,815+20,815,815+20);
     L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
 
     //Projecteur: Images / Code simple
     Mat *imagesProj;
     imagesProj=L->readImages((char *) nameProj.c_str(), 0, nb-1, -1.0);
-    L->computeMask(0,imagesProj,nb,1,5.0,1,0,0);
+    L->computeMask(0,imagesProj,nb,1,5.0,1,-1,-1,-1,-1); // toute l'image
     L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
 
 
@@ -239,9 +253,43 @@ int main(int argc, char *argv[]) {
     string namemixProj = FN_SCAN_MIXP;
 
 
+    // qui est l'usager??
+    char *user=getenv("USER");
+    printf("Usager %s\n",user);
+
+    int doCapture=0;
+    int doScan=0;
+    int doTriangule=0;
+
+    if( strcmp(user,"roys")==0 ) {
+        // initialisations juste pour sebastien
+        doCapture=0;
+        doScan=1;
+        doTriangule=0;
+    }else{
+        // initialisations juste pour chaima
+        doCapture=0;
+        doScan=1;
+        doTriangule=1;
+    }
+
+    // options
+    for(int i=1;i<argc;i++) {
+        if( strcmp("-h",argv[i])==0 ) {
+            printf("Usage: %s -h\n",argv[0]);
+            exit(0);
+        }else if( strcmp("-capture",argv[i])==0 ) {
+            doCapture=1;continue;
+        }else if( strcmp("-scan",argv[i])==0 ) {
+            doScan=1;continue;
+        }else if( strcmp("-triangule",argv[i])==0 ) {
+            doTriangule=1;continue;
+        }
+    }
+
 
     /* ----------------------- Capture ----------------------- */
-    if(CAPTURE) {
+    if( doCapture ) {
 
         printf("----- Capture -----\n");
 
@@ -293,19 +341,7 @@ int main(int argc, char *argv[]) {
     }
 
     /* ----------------------- Scan 3D ----------------------- */
-    if(SCAN) {
-        char *user=getenv("USER");
-        printf("Usager %s\n",user);
-        printf("\n\n");
-
-
-        // options
-        for(int i=1;i<argc;i++) {
-            if( strcmp("-h",argv[i])==0 ) {
-                printf("Usage: %s -h\n",argv[0]);
-                exit(0);
-            }
-        }
+    if( doScan ) {
 
         if( strcmp(user,"roys")==0 ) {
             testLeopardSeb();
@@ -323,7 +359,7 @@ int main(int argc, char *argv[]) {
     }
 
     /* ----------------------- Triangulation ----------------------- */
-    if(TRIANGULE) {
+    if( doTriangule ) {
         triangulate(lutCam, lutProj);
     }
 

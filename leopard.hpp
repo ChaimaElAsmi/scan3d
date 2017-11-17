@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 
+
 class minfo {
 	public:
 	int idx; // index du match dans l'autre image  idx=y*w+x,  y=idx/w, x=idx%w
@@ -20,6 +21,11 @@ class minfo {
 #define LEOPARD_SIMPLE  0
 #define LEOPARD_QUADRATIC  1
 
+// strings pour les noms de fichier
+#define IDX_SCAN_MASKC   0
+#define IDX_SCAN_MEANC   1
+#define IDX_SCAN_MASKP   2
+#define IDX_SCAN_MEANP   3
 
 class leopard {
 
@@ -63,8 +69,15 @@ class leopard {
 	cv::Mat minProj,maxProj;
 
     //SousPixels
-    int wDecal = 5;
+    int wDecal;
     int *ptsCam,*ptsProj;
+
+    // filenames
+    const char *fn_scan_maskc;
+    const char *fn_scan_meanc;
+    const char *fn_scan_maskp;
+    const char *fn_scan_meanp;
+
 
     public:
 	leopard(); //int w,int h, int nb, int freq, bool blur,string pid);
@@ -72,7 +85,7 @@ class leopard {
 
     cv::Mat *readImages(char *name, int from, int to, double fct);
     cv::Mat *readImages2(cv::Mat *cam, int from, int to);
-    void computeMask(int cam,cv::Mat *img,int nb,double seuil,double bias,int step,int offx,int offy);
+    void computeMask(int cam,cv::Mat *img,int nb,double seuil,double bias,int step,int xmin,int xmax,int ymin,int ymax);
     void computeCodes(int cam,int type,cv::Mat *img);
     void prepareMatch();
     void forceBrute(int sp, unsigned char mix);
@@ -86,6 +99,7 @@ class leopard {
     int doShiftCodes();
     int sumCost();
     void statsCodes(int cam);
+    void setPath(int idx,const char *filename);
 
 
   private:
