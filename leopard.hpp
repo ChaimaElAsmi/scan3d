@@ -12,6 +12,7 @@ class minfo {
 	unsigned short cost; // cout du match
     float subpx; // souspixels en x
     float subpy; // souspixels en y
+    unsigned char mix; // [0..255] pour un mix de [0..1]
 	//unsigned short active; // 1 = try to find this match, 0 = do not compute this match.
 };
 
@@ -74,13 +75,13 @@ class leopard {
     void computeMask(int cam,cv::Mat *img,int nb,double seuil,double bias,int step,int offx,int offy);
     void computeCodes(int cam,int type,cv::Mat *img);
     void prepareMatch();
-	void forceBrute();
+    void forceBrute(int sp, unsigned char mix);
     void sousPixels();
     void unSousPixels(int i);
     void initSP();
     void unInitSP();
-    void makeLUT(cv::Mat &lut,int cam);
-    int doLsh(int sp);
+    void makeLUT(cv::Mat &lut, cv::Mat &imgmix, int cam);
+    int doLsh(int sp, unsigned char mix);
     int doHeuristique();
     int doShiftCodes();
     int sumCost();
@@ -94,13 +95,15 @@ class leopard {
 	int cost(unsigned long *a,unsigned long *b);
     int bitCount(unsigned long n);
 	void match2image(cv::Mat &lut,minfo *match,unsigned char *mask,int w,int h,int ww,int hh);
+    void mix2image(cv::Mat &imgmix,minfo *match,unsigned char *mask,int w,int h,int ww,int hh);
 
     int lsh(int dir, unsigned long *codeA, minfo *matchA, unsigned char *maskA, int wa, int ha,
-                     unsigned long *codeB, minfo *matchB, unsigned char *maskB, int wb, int hb, int aisCam);
+                     unsigned long *codeB, minfo *matchB, unsigned char *maskB, int wb, int hb,
+                     int aisCam, unsigned char mix);
 	int heuristique( unsigned long *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
 					 unsigned long *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb);
 
-        void shiftCodes(int shift, unsigned long *codes, int w, int h);
+    void shiftCodes(int shift, unsigned long *codes, int w, int h);
 
 	//unsigned char bitCount[256]; // precomputed bit count
 

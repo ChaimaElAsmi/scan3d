@@ -62,6 +62,15 @@ void composePoseMatrix(Mat &poseMatrix, Mat rotation, Mat translation) {
     poseMatrix = idt * mat_trans * mat_rot;
 }
 
+
+double randAToB(double a, double b) {
+    return a + (rand() / (RAND_MAX / (b-a)));
+}
+
+double randAOrB(double a, double b) {
+    return (rand()%2) * (b-a) + a;
+}
+
 int matrixCorr(Mat &pointsLut, Mat &pointsCorr, Mat lutSrc, Mat lutDst) {
 
     int lutSrc_r = lutSrc.rows;
@@ -101,13 +110,20 @@ int matrixCorr(Mat &pointsLut, Mat &pointsCorr, Mat lutSrc, Mat lutDst) {
         for(int c=0; c<lutSrc_c; c++) {
             if(mask.at<uchar>(r, c) == 0) continue;
 
+            //valeur aléatoire [-1,1]
+            //srand(time(NULL));
+            double varRand = randAOrB(1,-1);
+
             q = p+(r*lutSrc_c+c)*3;
             //printf("%d  %d  %d \n", q[0], q[1],q[3]);
-            pointsLut.at<double>(0,n) = c; // /1920.0*640.0;//TEST
-            pointsLut.at<double>(1,n) = r; // /1080.0*480.0;
-            pointsCorr.at<double>(0,n) = ((double)q[2]*lutDst_c)/65535;
-            pointsCorr.at<double>(1,n) = ((double)q[1]*lutDst_r)/65535;
-            printf("(%f, %f) -> (%f, %f) \n",pointsLut.at<double>(0,n),pointsLut.at<double>(1,n),
+            pointsLut.at<double>(0,n) = c;
+            pointsLut.at<double>(1,n) = r;
+            //TEST
+            pointsCorr.at<double>(0,n) = ( ((double)q[2]*lutDst_c)/65535 ) + varRand;
+            pointsCorr.at<double>(1,n) = ( ((double)q[1]*lutDst_r)/65535 ) + varRand;
+
+            if(n==10000)
+                printf("(%f, %f) -> (%f, %f) \n",pointsLut.at<double>(0,n),pointsLut.at<double>(1,n),
                                              pointsCorr.at<double>(0,n),pointsCorr.at<double>(1,n));
             n++;
         }
@@ -134,7 +150,7 @@ void undistortMatrix(Mat &pointsOutput, Mat pointsInput, Mat internes, Mat distC
     undistortPoints(points1D, pointsOutput, internes, distCoeffs);
     double *r = (double*) pointsOutput.data;
 
-    for(int i=0; i<pointsInputTr.rows;i++)
+    for(int i=0; i<pointsInputTr.rows;i+=(pointsInputTr.rows/2))
     cout  << q[0+i*2] << ", " << q[1+i*2] << "  ->  " << r[0+i*2] << " , " << r[1+i*2] << endl;
 }
 
@@ -279,7 +295,7 @@ void triangulate(Mat lutCam, Mat lutProj) {
     cout << point4D.rows << "    " << point4D.cols << endl;
 
     double w, x, y, z;
-    for(int c=0; c<point4D.cols; c++) {
+    for(int c=0; c<point4D.cols; c+=(point4D.cols/2)) {
 
         w = point4D.at<double>(3,c);
         x = point4D.at<double>(0,c)/w;

@@ -56,14 +56,16 @@ void testLeopardSeb() {
     L->prepareMatch();
     //L->forceBrute();
     for(int i=0;i<20;i++) {
-        L->doLsh(0);
+        L->doLsh(0,0);
         //L->doHeuristique();
     }
 
     cv::Mat lutCam;
     cv::Mat lutProj;
-    L->makeLUT(lutCam,1);
-    L->makeLUT(lutProj,0);
+    cv::Mat mixCam;
+    cv::Mat mixProj;
+    L->makeLUT(lutCam,mixCam,1);
+    L->makeLUT(lutProj,mixProj,0);
 
     imwrite("lutcam.png",lutCam);
     imwrite("lutproj.png",lutProj);
@@ -76,7 +78,8 @@ void testLeopardSeb() {
 
 
 void testLeopardChaima(string nameCam, string nameProj, string namelutC, string namelutP,
-                       Mat *imgCam, Mat &lutCam, Mat &lutProj, int sp) {
+                       string namemixC, string namemixP,
+                       Mat *imgCam, Mat &lutCam, Mat &lutProj, Mat &mixCam, Mat &mixProj, int sp) {
     printf("----- test leopard chaima -----\n");
 
 
@@ -90,7 +93,7 @@ void testLeopardChaima(string nameCam, string nameProj, string namelutC, string 
 
     leopard *L=new leopard();
     int nb = 60;
-    int from = 20;
+    int from = 100;
     //Camera: Images / Code simple
     Mat *imagesCam;
     if(imgCam->rows != 0) {
@@ -99,7 +102,7 @@ void testLeopardChaima(string nameCam, string nameProj, string namelutC, string 
     else {
         imagesCam = L->readImages((char *) nameCam.c_str(), from, from+nb-1, -1.0);
     }
-    L->computeMask(1,imagesCam,nb,0.45,5.0,1,0,0);
+    L->computeMask(1,imagesCam,nb,0.45,5.0,1,815,815);
     L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
 
     //Projecteur: Images / Code simple
@@ -134,7 +137,7 @@ void testLeopardChaima(string nameCam, string nameProj, string namelutC, string 
     L->computeCodes(0,LEOPARD_QUADRATIC,imagesProjMix);
 
     for(int j=0; j<10; j++)
-        L->doLsh(0);
+        L->doLsh(0,0);
 
     sumCostS = L->sumCost();
 
@@ -149,7 +152,7 @@ void testLeopardChaima(string nameCam, string nameProj, string namelutC, string 
     L->computeCodes(0,LEOPARD_QUADRATIC,imagesProjMix);
 
     for(int j=0; j<10; j++)
-        L->doLsh(0);
+        L->doLsh(0,0);
 
     sumCostP = L->sumCost();
 
@@ -159,7 +162,7 @@ void testLeopardChaima(string nameCam, string nameProj, string namelutC, string 
     L->prepareMatch();
     if(sumCostS < sumCostP) {
         printf("\n match avec la suivante ! \n");
-        for(double fct=0; fct<=1; fct+=0.3) {
+        for(double fct=0; fct<=1; fct+=0.1) {
             printf("\n\n---------------------- facteur = %.2f ----------------------\n\n", fct);
 
             for(int i=0; i<nb-1; i++)
@@ -172,13 +175,14 @@ void testLeopardChaima(string nameCam, string nameProj, string namelutC, string 
 
             //TEST: pas de cumul
             //L->prepareMatch();
-            for(int j=0; j<10; j++)
-                L->doLsh(sp);
+//            for(int j=0; j<10; j++)
+//                L->doLsh(sp,(int) (fct*255));
+            L->forceBrute(sp,(int) (fct*255));
         }
     }
     else {
         printf("\n match avec la précédente ! \n");
-        for(double fct=0; fct<=1; fct+=0.3) {
+        for(double fct=0; fct<=1; fct+=0.1) {
             printf("\n\n---------------------- facteur = %.2f ----------------------\n\n", fct);
 
             for(int i=nb-1; i>0; i--)
@@ -191,17 +195,20 @@ void testLeopardChaima(string nameCam, string nameProj, string namelutC, string 
 
             //TEST: pas de cumul
             //L->prepareMatch();
-            for(int j=0; j<10; j++)
-                L->doLsh(sp);
+//            for(int j=0; j<10; j++)
+//                L->doLsh(sp,(int) (fct*255));
+            L->forceBrute(sp,(int) (fct*255));
         }
     }
 
     //L->forceBrute();
 
-    L->makeLUT(lutCam,1);
-    L->makeLUT(lutProj,0);
+    L->makeLUT(lutCam,mixCam,1);
+    L->makeLUT(lutProj,mixProj,0);
     imwrite(namelutC, lutCam);
     imwrite(namelutP, lutProj);
+    imwrite(namemixC, mixCam);
+    imwrite(namemixP, mixProj);
 
 
     double timeE = horloge();
@@ -221,12 +228,15 @@ int main(int argc, char *argv[]) {
     int nbImages = 300;
     Mat img[nbImages];
 
-    string nameCam, nameProj;
     Mat lutCam;
     Mat lutProj;
+    Mat mixCam;
+    Mat mixProj;
 
-    nameCam  = FN_CAP_CAM;
-    nameProj = FN_CAP_PROJ;
+    string nameCam  = FN_CAP_CAM;
+    string nameProj = FN_CAP_PROJ;
+    string namemixCam  = FN_SCAN_MIXC;
+    string namemixProj = FN_SCAN_MIXP;
 
 
 
@@ -300,7 +310,8 @@ int main(int argc, char *argv[]) {
         if( strcmp(user,"roys")==0 ) {
             testLeopardSeb();
         }else if( strcmp(user,"chaima")==0 ) {
-            testLeopardChaima(nameCam, nameProj, FN_SCAN_LUTC, FN_SCAN_LUTP, img, lutCam, lutProj, 1);
+            testLeopardChaima(nameCam, nameProj, FN_SCAN_LUTC, FN_SCAN_LUTP,
+                              namemixCam, namemixProj, img, lutCam, lutProj, mixCam, mixProj, SP);
         }
     }
     else {
