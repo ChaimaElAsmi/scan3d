@@ -5,18 +5,45 @@
 #include <stdio.h>
 
 #include <triangulation.hpp>
-#include <paths.hpp>
 
 using namespace cv;
 using namespace std;
 
 
-int initMat(string file, Mat &internes, Mat &rotation, Mat &translation, Mat &distCoeffs) {
 
-    internes = Mat::zeros(3, 3, CV_64F);
-    rotation = Mat::zeros(3, 3, CV_64F);
-    translation = Mat::zeros(3, 1, CV_64F);
-    distCoeffs = Mat::zeros(5, 1, CV_64F);
+triangulation::triangulation() {
+    cout << endl;
+    cout << "----- Triangulation -----" << endl;
+
+    internes_proj = Mat::zeros(3, 3, CV_64F);
+    rotation_proj = Mat::zeros(3, 3, CV_64F);
+    translation_proj = Mat::zeros(3, 1, CV_64F);
+    distCoeffs_proj = Mat::zeros(5, 1, CV_64F);
+    poseMatrix_proj = Mat::zeros(3, 4, CV_64F);
+
+    internes_cam = Mat::zeros(3, 3, CV_64F);
+    rotation_cam = Mat::zeros(3, 3, CV_64F);
+    translation_cam = Mat::zeros(3, 1, CV_64F);
+    distCoeffs_cam = Mat::zeros(5, 1, CV_64F);
+    poseMatrix_cam = Mat::zeros(3, 4, CV_64F);
+
+    // strings pour les filename
+    fn_tr_mask=NULL;
+    fn_tr_data=NULL;
+    fn_tr_parc=NULL;
+    fn_tr_parp=NULL;
+
+}
+
+
+
+triangulation::~triangulation() {
+    cout << endl;
+    cout << "----- Triangulation Done -----" << endl;
+}
+
+
+int triangulation::initMat(string file, Mat &internes, Mat &rotation, Mat &translation, Mat &distCoeffs) {
 
     FileStorage fsI(file, FileStorage::READ);
     if(!fsI.isOpened()) {
@@ -33,9 +60,7 @@ int initMat(string file, Mat &internes, Mat &rotation, Mat &translation, Mat &di
     return 0;
 }
 
-void composePoseMatrix(Mat &poseMatrix, Mat rotation, Mat translation) {
-
-    poseMatrix = Mat::zeros(3, 4, CV_64F);
+void triangulation::composePoseMatrix(Mat &poseMatrix, Mat rotation, Mat translation) {
 
     Mat idt = Mat::eye(3, 4, CV_64F);
     Mat mat_trans = Mat::eye(4, 4, CV_64F);
@@ -71,7 +96,7 @@ double randAOrB(double a, double b) {
     return (rand()%2) * (b-a) + a;
 }
 
-int matrixCorr(Mat &pointsLut, Mat &pointsCorr, Mat lutSrc, Mat lutDst) {
+int triangulation::matrixCorr(Mat &pointsLut, Mat &pointsCorr, Mat lutSrc, Mat lutDst) {
 
     int lutSrc_r = lutSrc.rows;
     int lutSrc_c = lutSrc.cols;
@@ -100,7 +125,7 @@ int matrixCorr(Mat &pointsLut, Mat &pointsCorr, Mat lutSrc, Mat lutDst) {
     }
     cout << endl << n << " pixels sélectionnés!" << endl;
 
-    imwrite(FN_TR_MASK, mask);
+    imwrite(fn_tr_mask, mask);
 
     pointsLut = Mat::zeros(2, n, CV_64F);
     pointsCorr = Mat::zeros(2, n, CV_64F);
@@ -119,8 +144,8 @@ int matrixCorr(Mat &pointsLut, Mat &pointsCorr, Mat lutSrc, Mat lutDst) {
             pointsLut.at<double>(0,n) = c;
             pointsLut.at<double>(1,n) = r;
             //TEST
-            pointsCorr.at<double>(0,n) = ( ((double)q[2]*lutDst_c)/65535 ) + varRand;
-            pointsCorr.at<double>(1,n) = ( ((double)q[1]*lutDst_r)/65535 ) + varRand;
+            pointsCorr.at<double>(0,n) = ( ((double)q[2]*lutDst_c)/65535 ); //+ varRand;
+            pointsCorr.at<double>(1,n) = ( ((double)q[1]*lutDst_r)/65535 ); //+ varRand;
 
             if(n==10000)
                 printf("(%f, %f) -> (%f, %f) \n",pointsLut.at<double>(0,n),pointsLut.at<double>(1,n),
@@ -135,7 +160,7 @@ int matrixCorr(Mat &pointsLut, Mat &pointsCorr, Mat lutSrc, Mat lutDst) {
     return n;
 }
 
-void undistortMatrix(Mat &pointsOutput, Mat pointsInput, Mat internes, Mat distCoeffs) {
+void triangulation::undistortMatrix(Mat &pointsOutput, Mat pointsInput, Mat internes, Mat distCoeffs) {
 
     Mat pointsInputTr = pointsInput.t();
     Mat points1D = Mat(pointsInputTr.rows, 1, CV_64FC2);
@@ -154,7 +179,7 @@ void undistortMatrix(Mat &pointsOutput, Mat pointsInput, Mat internes, Mat distC
     cout  << q[0+i*2] << ", " << q[1+i*2] << "  ->  " << r[0+i*2] << " , " << r[1+i*2] << endl;
 }
 
-int lut2corr(Mat lutSrc, Mat internesSrc, Mat distCoeffsSrc, Mat &pointsUndSrc,
+int triangulation::lut2corr(Mat lutSrc, Mat internesSrc, Mat distCoeffsSrc, Mat &pointsUndSrc,
          Mat lutDst, Mat internesDst, Mat distCoeffsDst, Mat &pointsUndDst) {
 
     Mat pointsSrc;
@@ -179,10 +204,9 @@ int lut2corr(Mat lutSrc, Mat internesSrc, Mat distCoeffsSrc, Mat &pointsUndSrc,
     return size;
 }
 
-int saveMat(Mat point4D) {
+int triangulation::saveMat(Mat point4D) {
 
-    string filenameS = FN_TR_DATA;
-    FileStorage fsS(filenameS, FileStorage::WRITE);
+    FileStorage fsS(fn_tr_data, FileStorage::WRITE);
     if(!fsS.isOpened()) {
         cout << "Erreur! Le fichier Save n'est pas ouvert! \n" << endl;
         return -1;
@@ -196,71 +220,51 @@ int saveMat(Mat point4D) {
 }
 
 
-void triangulate(Mat lutCam, Mat lutProj) {
-    cout << "----- Triangulation -----" << endl;
+void triangulation::triangulate(Mat lutCam, Mat lutProj) {
 
-    //Projecteur
-    string fileProj = FN_TR_PPROJ;
-    Mat int_proj;
-    Mat rot_proj;
-    Mat trans_proj;
-    Mat distCoeffs_proj;
+    /* ---Projecteur--- */
 
     //Récupérer les matrices internes, rotation et translation
-    initMat(fileProj, int_proj, rot_proj, trans_proj, distCoeffs_proj);
+    initMat(fn_tr_parp, internes_proj, rotation_proj, translation_proj, distCoeffs_proj);
 
     cout << "--------------------------" << endl;
     cout << "Matrices du projecteur :" << endl;
     cout << "--------------------------" << endl;
-    cout << "   Internes = " << endl << int_proj << endl;
+    cout << "   Internes = " << endl << internes_proj << endl;
     cout << endl;
-    cout << "   Rotation = " << endl << rot_proj << endl;
+    cout << "   Rotation = " << endl << rotation_proj << endl;
     cout << endl;
-    cout << "   Translation = " << endl << trans_proj << endl << endl;
+    cout << "   Translation = " << endl << translation_proj << endl << endl;
     cout << endl;
     cout << "   DistCoeffs = " << endl << distCoeffs_proj << endl << endl;
 
-    Mat poseMatrixProj;
-
     //composer la matrice de projection
-    composePoseMatrix(poseMatrixProj, rot_proj, trans_proj);
+    composePoseMatrix(poseMatrix_proj, rotation_proj, translation_proj);
 
-    cout << "   Matrice [R|t] = " << endl << poseMatrixProj << endl;
+    cout << "   Matrice [R|t] = " << endl << poseMatrix_proj << endl;
 
 
-    //Cameras
-    string fileCam = FN_TR_PCAM;
-    Mat int_cam;
-    Mat rot_cam;
-    Mat trans_cam;
-    Mat distCoeffs_cam;
+    /* ---Camera--- */
 
     //Récupérer les matrices internes, rotation et translation
-    initMat(fileCam, int_cam, rot_cam, trans_cam, distCoeffs_cam);
+    initMat(fn_tr_parc, internes_cam, rotation_cam, translation_cam, distCoeffs_cam);
 
     cout << endl << endl;
     cout << "--------------------------" << endl;
     cout << "Matrices de la caméra :" << endl;
     cout << "--------------------------" << endl;
-    cout << "   Internes = " << endl << int_cam << endl;
+    cout << "   Internes = " << endl << internes_cam << endl;
     cout << endl;
-    cout << "   Rotation = " << endl << rot_cam << endl;
+    cout << "   Rotation = " << endl << rotation_cam << endl;
     cout << endl;
-    cout << "   Translation = " << endl << trans_cam << endl << endl;
+    cout << "   Translation = " << endl << translation_cam << endl << endl;
     cout << endl;
     cout << "   DistCoeffs = " << endl << distCoeffs_cam << endl << endl;
 
-    Mat poseMatrixCam;
-
     //composer la matrice de projection
-    composePoseMatrix(poseMatrixCam, rot_cam, trans_cam);
+    composePoseMatrix(poseMatrix_cam, rotation_cam, translation_cam);
 
-    cout << "   Matrice [R|t] = " << endl << poseMatrixCam << endl;
-
-
-    //Init
-//    string nameProj  = "lutproj_200.png";
-//    string nameCam  = "lutcam_200.png";
+    cout << "   Matrice [R|t] = " << endl << poseMatrix_cam << endl;
 
     Mat pointsUndLut;
     Mat pointsUndCorr;
@@ -270,19 +274,19 @@ void triangulate(Mat lutCam, Mat lutProj) {
     //Triangulation
     if(TR_CAM) {
         /* Cam -> Proj */
-        size = lut2corr(lutCam,  int_cam,  distCoeffs_cam,  pointsUndLut,
-                   lutProj, int_proj, distCoeffs_proj, pointsUndCorr);
+        size = lut2corr(lutCam,  internes_cam,  distCoeffs_cam,  pointsUndLut,
+                   lutProj, internes_proj, distCoeffs_proj, pointsUndCorr);
 
         point4D = Mat::zeros(4, size, CV_64F);
-        triangulatePoints(poseMatrixCam, poseMatrixProj, pointsUndLut, pointsUndCorr, point4D);
+        triangulatePoints(poseMatrix_cam, poseMatrix_proj, pointsUndLut, pointsUndCorr, point4D);
     }
     else {
         /* Proj -> Cam */
-        size = lut2corr(lutProj, int_proj, distCoeffs_proj, pointsUndLut,
-                   lutCam,  int_cam,  distCoeffs_cam,  pointsUndCorr);
+        size = lut2corr(lutProj, internes_proj, distCoeffs_proj, pointsUndLut,
+                   lutCam,  internes_cam,  distCoeffs_cam,  pointsUndCorr);
 
         point4D = Mat::zeros(4, size, CV_64F);
-        triangulatePoints(poseMatrixProj, poseMatrixCam, pointsUndLut, pointsUndCorr, point4D);
+        triangulatePoints(poseMatrix_proj, poseMatrix_cam, pointsUndLut, pointsUndCorr, point4D);
     }
 
     //Display Coordinates
@@ -308,6 +312,19 @@ void triangulate(Mat lutCam, Mat lutProj) {
     //Save
     saveMat(point4D);
 
-    cout << endl;
-    cout << "----- Triangulation Done -----" << endl;
 }
+
+
+void triangulation::setPathT(int idx,string path,const char *filename) {
+
+    string newfilename = path + (string) filename;
+
+    switch( idx ) {
+        case IDX_TR_MASK : fn_tr_mask=strdup(newfilename.c_str());break;
+        case IDX_TR_DATA : fn_tr_data=strdup(newfilename.c_str());break;
+        case IDX_TR_PARC : fn_tr_parc=strdup(newfilename.c_str());break;
+        case IDX_TR_PARP : fn_tr_parp=strdup(newfilename.c_str());break;
+        default: printf("setPathT: code %d inconnu!!!!!!!!!\n",idx); break;
+    }
+}
+
