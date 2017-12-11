@@ -105,17 +105,13 @@ class leopard {
     void computeCodes(int cam,int type,cv::Mat *img);
     void prepareMatch();
     void forceBrute(int sp, unsigned char mix);
-    void sousPixels();
-    void unSousPixels(int i);
-    void initSP();
-    void unInitSP();
     void makeLUT(cv::Mat &lut, cv::Mat &imgmix, int cam);
     int doLsh(int sp, unsigned char mix);
     int doHeuristique();
     int doShiftCodes();
     int sumCost();
     void statsCodes(int cam);
-    void setPath(int idx,const char *filename);
+    void setPathL(int idx, std::string path, const char *filename);
 
 
   private:
@@ -147,9 +143,16 @@ class leopard {
 	int heuristique( unsigned long *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
 					 unsigned long *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb);
     void shiftCodes(int shift, unsigned long *codes, int w, int h);
+<<<<<<< HEAD
 #endif
 
 
+=======
+    void sousPixels();
+    void unSousPixels(int i);
+    void initSP();
+    void unInitSP();
+>>>>>>> chaima
 
 	//unsigned char bitCount[256]; // precomputed bit count
 

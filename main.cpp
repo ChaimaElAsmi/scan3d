@@ -1,7 +1,10 @@
 ﻿#include <QCoreApplication>
 #include <opencv2/opencv.hpp>
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <unistd.h>
+
+
 
 
 #include <leopard.hpp>
@@ -34,10 +37,11 @@ void testLeopardSeb() {
     leopard *L=new leopard();
 
     // setup les output
-    L->setPath(IDX_SCAN_MASKC,"maskcam.png");
-    L->setPath(IDX_SCAN_MEANC,"meancam.png");
-    L->setPath(IDX_SCAN_MASKP,"maskproj.png");
-    L->setPath(IDX_SCAN_MEANP,"meanproj.png");
+    string pathscan = "";
+    L->setPathL(IDX_SCAN_MASKC,pathscan,"maskcam.png");
+    L->setPathL(IDX_SCAN_MEANC,pathscan,"meancam.png");
+    L->setPathL(IDX_SCAN_MASKP,pathscan,"maskproj.png");
+    L->setPathL(IDX_SCAN_MEANP,pathscan,"meanproj.png");
 
     /// lire des images
     int nb=40;
@@ -84,9 +88,10 @@ void testLeopardSeb() {
 }
 
 
-void testLeopardChaima(string nameCam, string nameProj, string namelutC, string namelutP,
+void testLeopardChaima(string nameCam,  string nameProj,
+                       string namelutC, string namelutP,
                        string namemixC, string namemixP,
-                       Mat *imgCam, Mat &lutCam, Mat &lutProj, Mat &mixCam, Mat &mixProj, int sp) {
+                       Mat *imgCam, Mat &lutCam, Mat &lutProj, int sp) {
     printf("----- test leopard chaima -----\n");
 
 
@@ -101,10 +106,10 @@ void testLeopardChaima(string nameCam, string nameProj, string namelutC, string 
     leopard *L=new leopard();
 
     // setup les filename
-    L->setPath(IDX_SCAN_MASKC,FN_SCAN_MASKC);
-    L->setPath(IDX_SCAN_MEANC,FN_SCAN_MEANC);
-    L->setPath(IDX_SCAN_MASKP,FN_SCAN_MASKP);
-    L->setPath(IDX_SCAN_MEANP,FN_SCAN_MEANP);
+    L->setPathL(IDX_SCAN_MASKC,path,FN_SCAN_MASKC);
+    L->setPathL(IDX_SCAN_MEANC,path,FN_SCAN_MEANC);
+    L->setPathL(IDX_SCAN_MASKP,path,FN_SCAN_MASKP);
+    L->setPathL(IDX_SCAN_MEANP,path,FN_SCAN_MEANP);
 
     int nb = 60;
     int from = 100;
@@ -116,13 +121,13 @@ void testLeopardChaima(string nameCam, string nameProj, string namelutC, string 
     else {
         imagesCam = L->readImages((char *) nameCam.c_str(), from, from+nb-1, -1.0);
     }
-    L->computeMask(1,imagesCam,nb,0.45,5.0,1,815,815+20,815,815+20);
+    L->computeMask(1,imagesCam,nb,0.65,5.0,1,-1,-1,-1,-1); //815,815+20,815,815+20
     L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
 
     //Projecteur: Images / Code simple
     Mat *imagesProj;
     imagesProj=L->readImages((char *) nameProj.c_str(), 0, nb-1, -1.0);
-    L->computeMask(0,imagesProj,nb,1,5.0,1,-1,-1,-1,-1); // toute l'image
+    L->computeMask(0,imagesProj,nb,1.45,5.0,1,-1,-1,-1,-1); // toute l'image
     L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
 
 
@@ -172,6 +177,8 @@ void testLeopardChaima(string nameCam, string nameProj, string namelutC, string 
 
     printf("\n sumSuivante = %d, sumPrécédente = %d \n",sumCostS, sumCostP);
 
+    double timeSM = horloge();
+
     //Choix du mix
     L->prepareMatch();
     if(sumCostS < sumCostP) {
@@ -189,9 +196,11 @@ void testLeopardChaima(string nameCam, string nameProj, string namelutC, string 
 
             //TEST: pas de cumul
             //L->prepareMatch();
-//            for(int j=0; j<10; j++)
-//                L->doLsh(sp,(int) (fct*255));
-            L->forceBrute(sp,(int) (fct*255));
+            for(int j=0; j<20; j++)
+                L->doLsh(sp,(int) (fct*255));
+
+
+            //L->forceBrute(sp,(int) (fct*255));
         }
     }
     else {
@@ -200,7 +209,7 @@ void testLeopardChaima(string nameCam, string nameProj, string namelutC, string 
             printf("\n\n---------------------- facteur = %.2f ----------------------\n\n", fct);
 
             for(int i=nb-1; i>0; i--)
-                imagesProjMix[i] = imagesProj[i]*(1-fct) + imagesProj[i-1]*fct;
+            imagesProjMix[i] = imagesProj[i]*(1-fct) + imagesProj[i-1]*fct;
             imagesProjMix[0] = imagesProj[0];
 
             //QUAD
@@ -209,14 +218,19 @@ void testLeopardChaima(string nameCam, string nameProj, string namelutC, string 
 
             //TEST: pas de cumul
             //L->prepareMatch();
-//            for(int j=0; j<10; j++)
-//                L->doLsh(sp,(int) (fct*255));
-            L->forceBrute(sp,(int) (fct*255));
+            for(int j=0; j<20; j++)
+                L->doLsh(sp,(int) (fct*255));
+
+
+            //L->forceBrute(sp,(int) (fct*255));
         }
     }
 
+    double timeEM = horloge();
     //L->forceBrute();
 
+    Mat mixCam;
+    Mat mixProj;
     L->makeLUT(lutCam,mixCam,1);
     L->makeLUT(lutProj,mixProj,0);
     imwrite(namelutC, lutCam);
@@ -226,7 +240,8 @@ void testLeopardChaima(string nameCam, string nameProj, string namelutC, string 
 
 
     double timeE = horloge();
-    printf("\n Time = %f \n", timeE-timeS);
+    printf("\n Time Scan = %f \n", timeE-timeS);
+    printf("\n Time match mix = %f \n", timeEM-timeSM);
 
     delete[] imagesCam;
     delete[] imagesCamDecal;
@@ -244,13 +259,17 @@ int main(int argc, char *argv[]) {
 
     Mat lutCam;
     Mat lutProj;
-    Mat mixCam;
-    Mat mixProj;
 
     string nameCam  = FN_CAP_CAM;
     string nameProj = FN_CAP_PROJ;
-    string namemixCam  = FN_SCAN_MIXC;
-    string namemixProj = FN_SCAN_MIXP;
+
+    //Créer des directory pour stocker les images
+    string dir = "mkdir "+path+" "+path+
+                 "Output "+path+"Output/scan "+path+
+                 "Output/scan/lut "+path+
+                 "Output/scan/mask "+path+
+                 "Output/triangulation";  
+    system(dir.c_str());
 
 
     // qui est l'usager??
@@ -260,6 +279,7 @@ int main(int argc, char *argv[]) {
     int doCapture=0;
     int doScan=0;
     int doTriangule=0;
+    int doSp=0;
 
     if( strcmp(user,"roys")==0 ) {
         // initialisations juste pour sebastien
@@ -271,6 +291,7 @@ int main(int argc, char *argv[]) {
         doCapture=0;
         doScan=1;
         doTriangule=1;
+        doSp=1;
     }
 
     // options
@@ -284,6 +305,8 @@ int main(int argc, char *argv[]) {
             doScan=1;continue;
         }else if( strcmp("-triangule",argv[i])==0 ) {
             doTriangule=1;continue;
+        }else if( strcmp("-sp",argv[i])==0 ) {
+            doSp=1;continue;
         }
     }
 
@@ -346,21 +369,32 @@ int main(int argc, char *argv[]) {
         if( strcmp(user,"roys")==0 ) {
             testLeopardSeb();
         }else if( strcmp(user,"chaima")==0 ) {
-            testLeopardChaima(nameCam, nameProj, FN_SCAN_LUTC, FN_SCAN_LUTP,
-                              namemixCam, namemixProj, img, lutCam, lutProj, mixCam, mixProj, SP);
+            testLeopardChaima(nameCam, nameProj,
+                              (path+FN_SCAN_LUTC), (path+FN_SCAN_LUTP),
+                              (path+FN_SCAN_MIXC), (path+FN_SCAN_MIXP),
+                              img, lutCam, lutProj, doSp);
         }
     }
     else {
         printf("----- Pas de scan -----\n");
 
-        printf("erreur 1 \n");
-        lutCam  = imread(FN_SCAN_LUTC , CV_LOAD_IMAGE_UNCHANGED);
-        lutProj =  imread(FN_SCAN_LUTP, CV_LOAD_IMAGE_UNCHANGED);
+        lutCam  = imread((path+FN_SCAN_LUTC) , CV_LOAD_IMAGE_UNCHANGED);
+        lutProj =  imread((path+FN_SCAN_LUTP), CV_LOAD_IMAGE_UNCHANGED);
     }
 
     /* ----------------------- Triangulation ----------------------- */
     if( doTriangule ) {
-        triangulate(lutCam, lutProj);
+        triangulation *T=new triangulation();
+
+        string pathvide="";
+        //Paths
+        T->setPathT(IDX_TR_MASK,path,FN_TR_MASK);
+        T->setPathT(IDX_TR_DATA,path,FN_TR_DATA);
+        T->setPathT(IDX_TR_PARC,pathvide,FN_TR_PARC);
+        T->setPathT(IDX_TR_PARP,pathvide,FN_TR_PARP);
+
+        T->triangulate(lutCam, lutProj);
+        delete T;
     }
 
     return 0;

@@ -1325,13 +1325,16 @@ void leopard::mix2image(cv::Mat &imgmix,minfo *match,unsigned char *mask,int w,i
 
 
 
-void leopard::setPath(int idx,const char *filename) {
+void leopard::setPathL(int idx,std::string path,const char *filename) {
+
+    std::string newfilename = path + (std::string) filename;
+
     switch( idx ) {
-        case IDX_SCAN_MASKC : fn_scan_maskc=filename;break;
-        case IDX_SCAN_MEANC : fn_scan_meanc=filename;break;
-        case IDX_SCAN_MASKP : fn_scan_maskp=filename;break;
-        case IDX_SCAN_MEANP : fn_scan_meanp=filename;break;
-        default: printf("setPath: code %d inconnu!!!!!!!!!\n",idx); break;
+        case IDX_SCAN_MASKC : fn_scan_maskc=strdup(newfilename.c_str());break;
+        case IDX_SCAN_MEANC : fn_scan_meanc=strdup(newfilename.c_str());break;
+        case IDX_SCAN_MASKP : fn_scan_maskp=strdup(newfilename.c_str());break;
+        case IDX_SCAN_MEANP : fn_scan_meanp=strdup(newfilename.c_str());break;
+        default: printf("setPathL: code %d inconnu!!!!!!!!!\n",idx); break;
     }
 }
 
