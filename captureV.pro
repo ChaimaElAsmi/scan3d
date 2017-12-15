@@ -5,6 +5,7 @@ QT -= gui
 TARGET = captureV
 CONFIG += console
 CONFIG -= app_bundle
+CONFIG(debug, release|debug):DEFINES += _DEBUG
 
 TEMPLATE = app
 
