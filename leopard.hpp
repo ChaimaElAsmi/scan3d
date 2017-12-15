@@ -146,13 +146,11 @@ class leopard {
 <<<<<<< HEAD
 #endif
 
-
-=======
     void sousPixels();
     void unSousPixels(int i);
     void initSP();
     void unInitSP();
->>>>>>> chaima
+
 
 	//unsigned char bitCount[256]; // precomputed bit count
 
