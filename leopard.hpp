@@ -11,11 +11,9 @@
 //
 // definir pour utiliser gmp plutot que les codes maison
 //
-<<<<<<< HEAD
+
 //#define USE_GMP
-=======
-//  #define USE_GMP
->>>>>>> chaima
+
 
 
 class minfo {
@@ -147,10 +145,6 @@ class leopard {
 	int heuristique( unsigned long *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
 					 unsigned long *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb);
     void shiftCodes(int shift, unsigned long *codes, int w, int h);
-<<<<<<< HEAD
-=======
-
->>>>>>> chaima
 #endif
 
     void sousPixels();
