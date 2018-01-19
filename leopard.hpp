@@ -5,16 +5,26 @@
 #include <opencv2/opencv.hpp>
 
 #include <stdio.h>
-#include <gmp.h>
 #include <stdlib.h>
 
 //
 // definir pour utiliser gmp plutot que les codes maison
 //
-
 //#define USE_GMP
 
+#ifdef USE_GMP
+#include <gmp.h>
+#endif
+//
+// definir pour utiliser le vote extra qui simule un bit d'erreur
+//
+//#define EXTRA_ERREUR_BIT
 
+
+//
+// pour reduire les collisions lsh
+//
+//#define REDUCTION_COLLISIONS
 
 class minfo {
 	public:
@@ -103,10 +113,17 @@ class leopard {
 
     cv::Mat *readImages(char *name, int from, int to, double fct);
     cv::Mat *readImages2(cv::Mat *cam, int from, int to);
+    void noisify(cv::Mat *cam,int nb,double stddev=10.0,double mean=0.0);
     void computeMask(int cam,cv::Mat *img,int nb,double seuil,double bias,int step,int xmin,int xmax,int ymin,int ymax);
     void computeCodes(int cam,int type,cv::Mat *img);
     void prepareMatch();
     void forceBrute(int sp, unsigned char mix);
+    void forceBruteCam(int sp, unsigned char mix);
+    void forceBruteProj(int sp, unsigned char mix);
+    void sousPixels();
+    void unSousPixels(int i);
+    void initSP();
+    void unInitSP();
     void makeLUT(cv::Mat &lut, cv::Mat &imgmix, int cam);
     int doLsh(int sp, unsigned char mix);
     int doHeuristique();

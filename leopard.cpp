@@ -1,7 +1,7 @@
 #include <fstream>
 #include <leopard.hpp>
 
-#include <sys/time.h>
+//#include <sys/time.h>
 
 
 //
@@ -81,9 +81,12 @@ leopard::~leopard() {
 
 
 double leopard::horloge() {
+    /*
 	struct timeval tv;
 	gettimeofday(&tv,NULL);
 	return((double)tv.tv_sec+tv.tv_usec/1000000.0);
+    */
+    return(1.5);
 }
 
 //On passe le nom des images
@@ -98,6 +101,9 @@ cv::Mat *leopard::readImages(char *name,int from,int to, double fct) {
     for(i=0;i<nb;i++) {
         sprintf(buf,name,i+from);
         printf("read %d %s\n",i,buf);
+        FILE *F=fopen(buf,"r");
+        if( F==NULL ) return(NULL);
+        fclose(F);
         if(fct>0) {
             Mat tmp = imread(buf,CV_LOAD_IMAGE_GRAYSCALE);
             resize(tmp, image[i],cvSize(0,0),0.5,0.5);
@@ -119,6 +125,22 @@ cv::Mat *leopard::readImages(char *name,int from,int to, double fct) {
     }
     return image;
 }
+
+
+void leopard::noisify(cv::Mat *cam,int nb,double stddev,double mean) {
+    for(int i=0;i<nb;i++) {
+		// We need to work with signed images (as noise can be
+		// negative as well as positive). We use 16 bit signed
+		// images as otherwise we would lose precision.
+		Mat noise(cam[i].size(), CV_16SC1);
+		randn(noise, Scalar::all(mean), Scalar::all(stddev));
+		Mat tmp;
+		cam[i].convertTo(tmp,CV_16SC1);
+		addWeighted(tmp, 1.0, noise, 1.0, 0.0, tmp);
+		tmp.convertTo(cam[i],cam[i].type());
+    }
+}
+
 
 //On passe les images directement
 cv::Mat *leopard::readImages2(Mat *cam,int from,int to) {
@@ -837,6 +859,61 @@ void leopard::forceBrute(int sp, unsigned char mix) {
 }
 #endif
 
+void leopard::forceBruteCam(int sp, unsigned char mix) {
+    double t1=horloge();
+	int step=wc*hc/1000;
+	for(int i=0;i<wc*hc;i++) {
+		if( i%step==0 ) printf("%4.1f %%\n",i*100.0/wc/hc);
+		if( maskCam[i]==0 ) continue;
+		for(int j=0;j<wp*hp;j++) {
+			if( maskProj[j]==0 ) continue;
+			int c=cost(codeCam+i*nb,codeProj+j*nb);
+            if( c<matchCam[i].cost ) {
+                matchCam[i].idx=j;
+                matchCam[i].cost=c;
+                matchCam[i].mix=mix;
+                if(sp) unSousPixels(i);
+            }
+            if( c<matchProj[j].cost ) {
+                matchProj[j].idx=i;
+                matchProj[j].cost=c;
+                matchProj[i].mix=mix;
+
+            }
+		}
+	}
+    double t2=horloge();
+    printf("temps=%12.6f\n",t2-t1);
+}
+void leopard::forceBruteProj(int sp, unsigned char mix) {
+    double t1=horloge();
+	int step=wp*hp/1000;
+	for(int i=0;i<wp*hp;i++) {
+		if( i%step==0 ) printf("%4.1f %%\n",i*100.0/wp/hp);
+        int x=i%wp;
+        int y=i/wp;
+        if( x%2!=0 || y%2!=0 ) continue;
+        if( maskProj[i]==0 ) continue;
+		for(int j=0;j<wc*hc;j++) {
+            if( maskCam[j]==0 ) continue;
+			int c=cost(codeCam+j*nb,codeProj+i*nb);
+            if( c<matchCam[j].cost ) {
+                matchCam[j].idx=i;
+                matchCam[j].cost=c;
+                matchCam[j].mix=mix;
+                if(sp) unSousPixels(j);
+            }
+            if( c<matchProj[i].cost ) {
+                matchProj[i].idx=j;
+                matchProj[i].cost=c;
+                matchProj[i].mix=mix;
+            }
+		}
+	}
+    double t2=horloge();
+    printf("temps=%12.6f\n",t2-t1);
+}
+
 //sp : 1 = faire du sp
 //     0 = pas de sp
 //dans tous les cas, seulement la caméra qui a le sp
@@ -879,7 +956,7 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
 	bminfo bm[nv];
 	double now=horloge();
 
-    //log << "lsh " << nv << " bits, allocate "<< ((1<<nv)*sizeof(int)) << " bytes"<<warn;
+    //printf("lsh nv=%d bits, allocate %d bytes\n",nv,((1<<nv)*sizeof(int)));
 
 	if( vote==NULL) vote=(int *)malloc(nbvote*sizeof(int));
     int *q=vote;
@@ -897,7 +974,7 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
 #endif
             bm[i].vmask=1<<i;
 
-        //log << "bit " << i << " byte="<<(int)bm[i].byte<<", mask="<<(int)bm[i].mask<<", vmask="<<bm[i].vmask<<info;
+            //printf("bit %d mask=%d vmask=%d\n",i,bm[i].mask,bm[i].vmask);
 	}
 
     unsigned long *p;
@@ -919,9 +996,18 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
 #else
 			p=codeA+i*nb;
 			for(int k=0;k<nv;k++) {
-                                if( p[bm[k].byte] & bm[k].mask ) hash|=bm[k].vmask;
+                    if( p[bm[k].byte] & bm[k].mask ) hash|=bm[k].vmask;
 			}
 #endif
+            //
+            // flip un bit au hasard
+            // pour reduire les collisions, et donc obtenir de meilleurs candidats
+#ifdef REDUCTION_COLLISIONS
+            hash^=(1<<(rand()%nv));
+#endif
+
+            //if( hash<0 || hash>=nbvote ) { printf("******* out of bound %d vs %d\n",hash,nbvote);continue; }
+
             if( vote[hash]>=0 ) collision++;
             count++;
 			// basic case... ecrase les autres votes
@@ -941,7 +1027,7 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
     // stats
 	int holes=0;
 	for(int i=0;i<nbvote;i++) if( vote[i]<0 ) holes++;
-	//printf("espace dans les votes = %d%%\n",(holes*100/nbvote));
+	printf("espace dans les votes = %d%%\n",(holes*100/nbvote));
 
     int vide=0;
 
@@ -964,7 +1050,11 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
 			}
 #endif
 
-            for(int k=-1;k<0/*k<nv*/;k++) {
+#ifdef EXTRA_ERREUR_BIT
+            for(int k=-1;k<nv;k++) {
+#else
+            for(int k=-1;k<0;k++) {
+#endif
 
                 unsigned int superhash;
                 if( k<0 ) superhash=hash;
@@ -1027,7 +1117,7 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
     for(int i=0;i<wb*hb;i++) delta+=matchB[i].cost;
 
 
-    printf("time=%12.6f  redox=%10d A=%4d B=%3d vide=%3d%% collisions=%3d%% vide= %d (%d,%d)\n",now,redox,nbmatchA,nbmatchB,holes/(nbvote/100),
+    printf("time=%12.6f  redox=%10d A=%4d B=%3d Hvide=%3d%% collisions=%3d%% vide= %d (%d,%d)\n",now,redox,nbmatchA,nbmatchB,holes/(nbvote/100),
            collision/(count/100), vide,nbvote,count);
     return(vide);
 }
@@ -1300,7 +1390,7 @@ void leopard::match2image(cv::Mat &lut,minfo *match,unsigned char *mask,int w,in
         dyy=(int) (match[i].subpy*65535);
         //lut->at<Vec3s>(y,x)=Vec3s((xx*65535)/ww,(yy*65535)/hh,(cc*65535)/maxcost);
         if( mask[i]==0 ) {
-            lut.at<Vec3s>(y,x)=Vec3s( 0, 0, 0);
+            lut.at<Vec3s>(y,x)=Vec3s( 65535, 0, 0);
         }else{
             lut.at<Vec3s>(y,x)=Vec3s((cc*65535)/nbb, (yy*65535+dyy)/hh, (xx*65535+dxx)/ww);
         }

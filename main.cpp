@@ -47,16 +47,23 @@ void testLeopardSeb() {
     int nb=40;
     Mat *imagesCam;
     imagesCam=L->readImages((char *)"data/cam1/cam%03d.jpg",0,nb-1, -1.0);
+    imwrite("cam0-nonoise.png",imagesCam[0]);
+    // noise  0 : p(erreur)=0.058
+    // noise 10 : p(erreur)=0.078
+    // noise 20 : p(erreur)=??
+    //L->noisify(imagesCam,nb,20.0,0.0);
+    imwrite("cam0-noise.png",imagesCam[0]);
+
     L->computeMask(1,imagesCam,nb,1.45,5.0,1,-1,-1,-1,-1); // toute l'image
-    L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
-    //L->computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
+    //L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
+    L->computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
     delete[] imagesCam;
 
     Mat *imagesProj;
     imagesProj=L->readImages((char *)"data/proj1/leopard_2560_1080_32B_%03d.jpg",0,nb-1, -1.0);
     L->computeMask(0,imagesProj,nb,1.45,5.0,1,-1,-1,-1,-1); // toute l'image
-    L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
-    //L->computeCodes(0,LEOPARD_QUADRATIC,imagesProj);
+    //L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
+    L->computeCodes(0,LEOPARD_QUADRATIC,imagesProj);
     delete[] imagesProj;
 
     // quelques stats
@@ -65,7 +72,7 @@ void testLeopardSeb() {
 
     L->prepareMatch();
     //L->forceBrute();
-    for(int i=0;i<10;i++) {
+    for(int i=0;i<50;i++) {
         printf("--- %d ---\n",i);
         L->doLsh(0,0);
         //L->doHeuristique();
@@ -87,6 +94,68 @@ void testLeopardSeb() {
     printf("----- done -----\n");
 }
 
+
+int doSimple(int nb,char *camName,char *refName) {
+    printf("----- match leopard simple -----\n");
+
+    leopard *L=new leopard();
+
+    // setup les output
+    L->setPath(IDX_SCAN_MASKC,"maskcam.png");
+    L->setPath(IDX_SCAN_MEANC,"meancam.png");
+    L->setPath(IDX_SCAN_MASKP,"maskproj.png");
+    L->setPath(IDX_SCAN_MEANP,"meanproj.png");
+
+    /// lire des images
+    Mat *imagesCam;
+    imagesCam=L->readImages((char *)camName,0,nb-1, -1.0);
+    if( imagesCam==NULL ) {
+        printf("*** impossible de lire les images %s de 0 a %d\n",camName,nb-1);
+        return(-1);
+    }
+    
+    L->computeMask(1,imagesCam,nb,0.1,5.0,1,970,1070,240,400); // toute l'image
+    //L->computeMask(1,imagesCam,nb,1.45,5.0,1,-1,-1,-1,-1); // toute l'image
+    //L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
+    L->computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
+    delete[] imagesCam;
+
+    Mat *imagesProj;
+    imagesProj=L->readImages(refName,0,nb-1, -1.0);
+    if( imagesProj==NULL ) {
+        printf("*** impossible de lire les images %s de 0 a %d\n",refName,nb-1);
+        return(-1);
+    }
+    // normalement -1 pour ne pas mettre de limite
+    L->computeMask(0,imagesProj,nb,1.45,5.0,1,600,680,160,660); // toute l'image
+    //L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
+    L->computeCodes(0,LEOPARD_QUADRATIC,imagesProj);
+    delete[] imagesProj;
+
+    L->prepareMatch();
+    L->forceBruteProj(0,0);
+    // algo normal plus rapide
+    /*
+    for(int i=0;i<200;i++) {
+        printf("--- %d ---\n",i);
+        L->doLsh(0,0);
+    }
+    */
+
+    cv::Mat lutCam;
+    cv::Mat lutProj;
+    cv::Mat mixCam;
+    cv::Mat mixProj;
+    L->makeLUT(lutCam,mixCam,1);
+    L->makeLUT(lutProj,mixProj,0);
+
+    imwrite("lutcam.png",lutCam);
+    imwrite("lutproj.png",lutProj);
+
+    delete L;
+    printf("----- done -----\n");
+    return 0;
+}
 
 void testLeopardChaima(string nameCam,  string nameProj,
                        string namelutC, string namelutP,
@@ -258,7 +327,7 @@ void testLeopardChaima(string nameCam,  string nameProj,
 
 int main(int argc, char *argv[]) {
 
-    int nbImages =60;
+    int nbImages =300;
     Mat img[nbImages];
 
     Mat lutCam;
@@ -287,7 +356,7 @@ int main(int argc, char *argv[]) {
     int doScan=1;
     int doTriangule=0;
     int doSp=0;
-    int synchro=1;
+    int synchro=0;
 
     if( strcmp(user,"roys")==0 ) {
         // initialisations juste pour sebastien
@@ -304,8 +373,9 @@ int main(int argc, char *argv[]) {
 
     // options
     for(int i=1;i<argc;i++) {
+        printf("....%s\n",argv[i]);
         if( strcmp("-h",argv[i])==0 ) {
-            printf("Usage: %s -h\n",argv[0]);
+            printf("Usage: %s [-h] [-capture|-scan|-triangule] ou [-simple 60 cam%03d.png ref%03d.png]\n",argv[0]);
             exit(0);
         }else if( strcmp("-capture",argv[i])==0 ) {
             doCapture=1;continue;
@@ -318,9 +388,13 @@ int main(int argc, char *argv[]) {
         }else if( strcmp("-synchro",argv[i])==0 ) {
             nbImages=60;
             synchro=1;continue;
+        }else if( strcmp("-simple",argv[i])==0 && i+4<argc ) {
+            // simple match entre deux ensembles d'images
+            // -simple 60 cam%03d.png ref%03d.png camMask.png
+            doSimple(atoi(argv[i+1]),argv[i+2],argv[i+3]);
+            exit(0);
         }
     }
-
 
 
     /* ----------------------- Capture ----------------------- */
