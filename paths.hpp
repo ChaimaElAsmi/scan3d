@@ -7,14 +7,14 @@
 
 
 //Dossier principal pour contenir tous les output
-std::string path = "test/";
+std::string path = "Experiments/scanSync/";
 
 /* Capture:
     * FN_CAP_CAM  = images capturées camera
     * FN_CAP_PROJ = patterns de reference projecteur
 */
-#define FN_CAP_CAM "subpixel/res_1920x1080/capture/freq_50/cam_%04d.jpg"
-#define FN_CAP_PROJ "../../Mathematica/Images/1280x720/Patterns_60/freq_50/leopard_1280_720_%04d.jpg"
+#define FN_CAP_CAM  "capture/cam_%04d.jpg"
+#define FN_CAP_PROJ "patterns/leopard_1280_720_%04d.jpg"
 
 
 /* Scan:
@@ -26,15 +26,15 @@ std::string path = "test/";
     * FN_SCAN_MEANP = image moyenne du projecteur
 */
 
-#define FN_SCAN_LUTC "Output/scan/lut/lutcam_sp.png"
-#define FN_SCAN_LUTP "Output/scan/lut/lutproj_sp.png"
-#define FN_SCAN_MIXC "Output/scan/lut/mixcam_sp.png"
-#define FN_SCAN_MIXP "Output/scan/lut/mixproj_sp.png"
+#define FN_SCAN_LUTC "output/scan/lut/lutcam.png"
+#define FN_SCAN_LUTP "output/scan/lut/lutproj.png"
+#define FN_SCAN_MIXC "output/scan/lut/mixcam.png"
+#define FN_SCAN_MIXP "output/scan/lut/mixproj.png"
 
-#define FN_SCAN_MASKC "Output/scan/mask/maskCam_sp.png"
-#define FN_SCAN_MASKP "Output/scan/mask/maskProj_sp.png"
-#define FN_SCAN_MEANC "Output/scan/mask/meanCam_sp.png"
-#define FN_SCAN_MEANP "Output/scan/mask/meanProj_sp.png"
+#define FN_SCAN_MASKC "output/scan/mask/maskCam.png"
+#define FN_SCAN_MASKP "output/scan/mask/maskProj.png"
+#define FN_SCAN_MEANC "output/scan/mask/meanCam.png"
+#define FN_SCAN_MEANP "output/scan/mask/meanProj.png"
 
 
 /* Triangulation:
@@ -43,10 +43,10 @@ std::string path = "test/";
     * FN_TR_PARC  = paramètres internes/externes de la camera
     * FN_TR_PARP = paramètres internes/externes du projecteur
 */
-#define FN_TR_MASK  "Output/triangulation/mask_sp.png"
-#define FN_TR_DATA  "Output/triangulation/data_sp.xml"
-#define FN_TR_PARC  "subpixel/res_1920x1080/calibration/data/out_camera_data.xml"
-#define FN_TR_PARP  "subpixel/res_1920x1080/calibration/data/out_projector_data.xml"
+#define FN_TR_MASK  "output/triangulation/mask.png"
+#define FN_TR_DATA  "output/triangulation/data.xml"
+#define FN_TR_PARC  "../calibration/data/out_camera_data.xml"
+#define FN_TR_PARP  "../calibration/data/out_projector_data.xml"
 
 
 
