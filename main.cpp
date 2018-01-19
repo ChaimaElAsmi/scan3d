@@ -91,7 +91,7 @@ void testLeopardSeb() {
 void testLeopardChaima(string nameCam,  string nameProj,
                        string namelutC, string namelutP,
                        string namemixC, string namemixP,
-                       Mat *imgCam, Mat &lutCam, Mat &lutProj, int sp) {
+                       Mat *imgCam, Mat &lutCam, Mat &lutProj, int sp, int synchro) {
     printf("----- test leopard chaima -----\n");
 
 
@@ -112,7 +112,7 @@ void testLeopardChaima(string nameCam,  string nameProj,
     L->setPathL(IDX_SCAN_MEANP,path,FN_SCAN_MEANP);
 
     int nb = 60;
-    int from = 100;
+    int from = 0;//100;
     //Camera: Images / Code simple
     Mat *imagesCam;
     if(imgCam->rows != 0) {
@@ -201,6 +201,8 @@ void testLeopardChaima(string nameCam,  string nameProj,
 
 
             //L->forceBrute(sp,(int) (fct*255));
+            if(synchro)
+                break;
         }
     }
     else {
@@ -223,6 +225,8 @@ void testLeopardChaima(string nameCam,  string nameProj,
 
 
             //L->forceBrute(sp,(int) (fct*255));
+            if(synchro)
+                break;
         }
     }
 
@@ -254,21 +258,24 @@ void testLeopardChaima(string nameCam,  string nameProj,
 
 int main(int argc, char *argv[]) {
 
-    int nbImages = 300;
+    int nbImages =60;
     Mat img[nbImages];
 
     Mat lutCam;
     Mat lutProj;
 
-    string nameCam  = FN_CAP_CAM;
-    string nameProj = FN_CAP_PROJ;
+    string nameCam  = path+FN_CAP_CAM;
+    string nameProj = path+FN_CAP_PROJ;
+
+    printf("nameCm %s \n",(path+FN_SCAN_LUTC).c_str());
+    printf("namePr %s \n",(path+FN_SCAN_LUTP).c_str());
 
     //Créer des directory pour stocker les images
     string dir = "mkdir "+path+" "+path+
-                 "Output "+path+"Output/scan "+path+
-                 "Output/scan/lut "+path+
-                 "Output/scan/mask "+path+
-                 "Output/triangulation";  
+                 "output "+path+"otput/scan "+path+
+                 "output/scan/lut "+path+
+                 "output/scan/mask "+path+
+                 "output/triangulation";
     system(dir.c_str());
 
 
@@ -276,10 +283,11 @@ int main(int argc, char *argv[]) {
     char *user=getenv("USER");
     printf("Usager %s\n",user);
 
-    int doCapture=0;
-    int doScan=0;
+    int doCapture=1;
+    int doScan=1;
     int doTriangule=0;
     int doSp=0;
+    int synchro=1;
 
     if( strcmp(user,"roys")==0 ) {
         // initialisations juste pour sebastien
@@ -290,8 +298,8 @@ int main(int argc, char *argv[]) {
         // initialisations juste pour chaima
         doCapture=0;
         doScan=1;
-        doTriangule=1;
-        doSp=1;
+        doTriangule=0;
+        doSp=0;
     }
 
     // options
@@ -307,8 +315,12 @@ int main(int argc, char *argv[]) {
             doTriangule=1;continue;
         }else if( strcmp("-sp",argv[i])==0 ) {
             doSp=1;continue;
+        }else if( strcmp("-synchro",argv[i])==0 ) {
+            nbImages=60;
+            synchro=1;continue;
         }
     }
+
 
 
     /* ----------------------- Capture ----------------------- */
@@ -332,15 +344,65 @@ int main(int argc, char *argv[]) {
             cout << "Camera ready" << endl;
         }
 
-        srand(time(NULL));
-        int random = rand() % 500000;
-        cout << "random : " << random << endl;
-        usleep(random);
+//        srand(time(NULL));
+//        int random = rand() % 500000;
+//        cout << "random : " << random << endl;
+//        usleep(random);
+        int offset=0;
+        if(synchro){
+            //On suppose que les images sont répétées 5 fois
+            double somme[5];
+            Mat last,cur,tmp;
+            cap >> last;
+            cvtColor(last,last,CV_RGB2GRAY);
+            Scalar s;
+            for(int i=0;i<5;i++)
+                somme[i]=0;
+            for(int i=0; i<100;i++){
+                cap >> cur;
+                cvtColor(cur,cur,CV_RGB2GRAY);
+                absdiff(last,cur,tmp);
+//                if(i==10) {
+//                    imwrite("cur.png",cur);
+//                    imwrite("last.png",last);
+//                    imwrite("tmp.png",tmp);
+//                }
+                s = sum(tmp);
+                //printf("s %d %d %f \n",i%5,i,s.val[0]/1920.0/1080.0);
+                somme[i%5]+=s.val[0]/1920.0/1080.0;
+                last=cur.clone();
+            }
+
+            for(int i=0;i<5;i++){
+                if(somme[i]<somme[offset])
+                    offset=i;
+                printf("%d %f \n",i,somme[i]);
+            }
+            printf("offset = %d \n",offset);
+
+        }
+
+
 
         double timeS = horloge();
-        for(int i = 0; i < nbImages; i++) {
-            cap >> img[i];
-            //resize(img[i], resized[i], Size(640,480)); //(683,384)
+        if(synchro){
+            Mat vide;
+            int i,j;
+            for(i=0,j=0; j < nbImages; i++) {
+                if(i%5==offset) {
+                    cap >> img[j];
+                    j++;
+                }
+                else
+                    cap >> vide;
+            }
+        }else{
+
+            for(int i = 0; i < nbImages; i++) {
+                cap >> img[i];
+                printf("img %d \n",i);
+                //resize(img[i], resized[i], Size(640,480)); //(683,384)
+            }
         }
         double timeE = horloge();
         double xs, ys;
@@ -372,7 +434,7 @@ int main(int argc, char *argv[]) {
             testLeopardChaima(nameCam, nameProj,
                               (path+FN_SCAN_LUTC), (path+FN_SCAN_LUTP),
                               (path+FN_SCAN_MIXC), (path+FN_SCAN_MIXP),
-                              img, lutCam, lutProj, doSp);
+                              img, lutCam, lutProj, doSp, synchro);
         }
     }
     else {
