@@ -336,12 +336,9 @@ int main(int argc, char *argv[]) {
     string nameCam  = path+FN_CAP_CAM;
     string nameProj = path+FN_CAP_PROJ;
 
-    printf("nameCm %s \n",(path+FN_SCAN_LUTC).c_str());
-    printf("namePr %s \n",(path+FN_SCAN_LUTP).c_str());
-
     //Créer des directory pour stocker les images
     string dir = "mkdir "+path+" "+path+
-                 "output "+path+"otput/scan "+path+
+                 "output "+path+"output/scan "+path+
                  "output/scan/lut "+path+
                  "output/scan/mask "+path+
                  "output/triangulation";

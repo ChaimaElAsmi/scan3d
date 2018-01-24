@@ -164,11 +164,6 @@ class leopard {
     void shiftCodes(int shift, unsigned long *codes, int w, int h);
 #endif
 
-    void sousPixels();
-    void unSousPixels(int i);
-    void initSP();
-    void unInitSP();
-
 
 	//unsigned char bitCount[256]; // precomputed bit count
 
