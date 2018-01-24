@@ -7,6 +7,7 @@
 
 
 
+
 #include <leopard.hpp>
 #include <triangulation.hpp>
 #include <paths.hpp>
@@ -101,10 +102,11 @@ int doSimple(int nb,char *camName,char *refName) {
     leopard *L=new leopard();
 
     // setup les output
-    L->setPath(IDX_SCAN_MASKC,"maskcam.png");
-    L->setPath(IDX_SCAN_MEANC,"meancam.png");
-    L->setPath(IDX_SCAN_MASKP,"maskproj.png");
-    L->setPath(IDX_SCAN_MEANP,"meanproj.png");
+    string pathscan = "";
+    L->setPathL(IDX_SCAN_MASKC,pathscan,"maskcam.png");
+    L->setPathL(IDX_SCAN_MEANC,pathscan,"meancam.png");
+    L->setPathL(IDX_SCAN_MASKP,pathscan,"maskproj.png");
+    L->setPathL(IDX_SCAN_MEANP,pathscan,"meanproj.png");
 
     /// lire des images
     Mat *imagesCam;
