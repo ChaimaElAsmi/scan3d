@@ -1,4 +1,4 @@
-#include <QCoreApplication>
+//#include <QCoreApplication>
 #include <opencv2/opencv.hpp>
 #include <sys/time.h>
 #include <unistd.h>
