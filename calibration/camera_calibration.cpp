@@ -296,7 +296,7 @@ int main(int argc, char* argv[])
             break;
       }
 
-
+        imwrite( format("input_%02d.png", i+1), view );
         imageSize = view.size();  // Format input image.
         if( s.flipVertical )    flip( view, view, 0 );
 
@@ -341,7 +341,8 @@ int main(int argc, char* argv[])
 
                 // Draw the corners.
                 drawChessboardCorners( view, s.boardSize, Mat(pointBuf), found );
-                imwrite("/home/chaima/Documents/scanGit/scan3d/calibration/view.png",view);
+                //imwrite("/home/chaima/Documents/scanGit/scan3d/calibration/view.png",view);
+                imwrite( format("view_%02d.png", i+1), view );
 
         }
 
@@ -396,6 +397,7 @@ int main(int argc, char* argv[])
         initUndistortRectifyMap(cameraMatrix, distCoeffs, Mat(),
             getOptimalNewCameraMatrix(cameraMatrix, distCoeffs, imageSize, 1, imageSize, 0),
             imageSize, CV_16SC2, map1, map2);
+
 
         for(int i = 0; i < (int)s.imageList.size(); i++ )
         {
