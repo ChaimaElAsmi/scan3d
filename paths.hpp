@@ -7,14 +7,19 @@
 
 
 //Dossier principal pour contenir tous les output
-std::string path = "Experiments/scanSync/";
+std::string path = "Dossier/";
+#define NUM  ""
+#define CAP  "capture/"
+#define LUT  "output/scan/lut/"
+#define MASK "output/scan/mask/"
+#define TRG  "output/triangulation/"
 
 /* Capture:
     * FN_CAP_CAM  = images capturées camera
     * FN_CAP_PROJ = patterns de reference projecteur
 */
-#define FN_CAP_CAM  "capture/cam_%04d.jpg"
-#define FN_CAP_PROJ "patterns/leopard_1280_720_%04d.jpg"
+#define FN_CAP_CAM  CAP "cam_%04d.jpg" //"capture/cam_%04d.jpg"
+#define FN_CAP_PROJ "../../Experiments/scan60/patterns/leopard_1280_720_%04d.jpg"
 
 
 /* Scan:
@@ -26,15 +31,15 @@ std::string path = "Experiments/scanSync/";
     * FN_SCAN_MEANP = image moyenne du projecteur
 */
 
-#define FN_SCAN_LUTC "output/scan/lut/lutcam.png"
-#define FN_SCAN_LUTP "output/scan/lut/lutproj.png"
-#define FN_SCAN_MIXC "output/scan/lut/mixcam.png"
-#define FN_SCAN_MIXP "output/scan/lut/mixproj.png"
+#define FN_SCAN_LUTC LUT "lutcam" NUM ".png"
+#define FN_SCAN_LUTP LUT "lutproj" NUM ".png"
+#define FN_SCAN_MIXC LUT "mixcam" NUM ".png"
+#define FN_SCAN_MIXP LUT "mixproj" NUM ".png"
 
-#define FN_SCAN_MASKC "output/scan/mask/maskCam.png"
-#define FN_SCAN_MASKP "output/scan/mask/maskProj.png"
-#define FN_SCAN_MEANC "output/scan/mask/meanCam.png"
-#define FN_SCAN_MEANP "output/scan/mask/meanProj.png"
+#define FN_SCAN_MASKC MASK "maskCam" NUM ".png"
+#define FN_SCAN_MASKP MASK "maskProj" NUM ".png"
+#define FN_SCAN_MEANC MASK "meanCam" NUM ".png"
+#define FN_SCAN_MEANP MASK "meanProj" NUM ".png"
 
 
 /* Triangulation:
@@ -43,10 +48,10 @@ std::string path = "Experiments/scanSync/";
     * FN_TR_PARC  = paramètres internes/externes de la camera
     * FN_TR_PARP = paramètres internes/externes du projecteur
 */
-#define FN_TR_MASK  "output/triangulation/mask.png"
-#define FN_TR_DATA  "output/triangulation/data.xml"
-#define FN_TR_PARC  "../calibration/data/out_camera_data.xml"
-#define FN_TR_PARP  "../calibration/data/out_projector_data.xml"
+#define FN_TR_MASK  TRG "mask" NUM ".png"
+#define FN_TR_DATA  TRG "data" NUM ".xml"
+#define FN_TR_PARC  "Experiments/calibration/data/out_camera_data.xml"
+#define FN_TR_PARP  "Experiments/calibration/data/out_projector_data.xml"
 
 
 
