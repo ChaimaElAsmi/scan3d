@@ -106,13 +106,16 @@ class leopard {
     const char *fn_scan_maskp;
     const char *fn_scan_meanp;
 
+    private:
+    cv::Mat *readImagesInterne(char *name, int from, int to, double fct,int flags);
 
     public:
 	leopard(); //int w,int h, int nb, int freq, bool blur,string pid);
 	~leopard();
 
-    cv::Mat *readImages(char *name, int from, int to, double fct);
-    cv::Mat *readImages2(cv::Mat *cam, int from, int to);
+    cv::Mat *readImagesGray(char *name, int from, int to, double fct);
+    cv::Mat *readImagesBGR(char *name, int from, int to, double fct);
+    cv::Mat *convertToGray(cv::Mat *cam, int from, int to);
     void noisify(cv::Mat *cam,int nb,double stddev=10.0,double mean=0.0);
     void computeMask(int cam,cv::Mat *img,int nb,double seuil,double bias,int step,int xmin,int xmax,int ymin,int ymax);
     void computeCodes(int cam,int type,cv::Mat *img);

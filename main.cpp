@@ -45,7 +45,7 @@ void testLeopardSeb() {
     /// lire des images
     int nb=40;
     Mat *imagesCam;
-    imagesCam=L->readImages((char *)"data/cam1/cam%03d.jpg",0,nb-1, -1.0);
+    imagesCam=L->readImagesGray((char *)"data/cam1/cam%03d.jpg",0,nb-1, -1.0);
     imwrite("cam0-nonoise.png",imagesCam[0]);
     // noise  0 : p(erreur)=0.058
     // noise 10 : p(erreur)=0.078
@@ -59,7 +59,7 @@ void testLeopardSeb() {
     delete[] imagesCam;
 
     Mat *imagesProj;
-    imagesProj=L->readImages((char *)"data/proj1/leopard_2560_1080_32B_%03d.jpg",0,nb-1, -1.0);
+    imagesProj=L->readImagesGray((char *)"data/proj1/leopard_2560_1080_32B_%03d.jpg",0,nb-1, -1.0);
     L->computeMask(0,imagesProj,nb,1.45,5.0,1,-1,-1,-1,-1); // toute l'image
     //L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
     L->computeCodes(0,LEOPARD_QUADRATIC,imagesProj);
@@ -108,7 +108,7 @@ int doSimple(int nb,char *camName,char *refName) {
 
     /// lire des images
     Mat *imagesCam;
-    imagesCam=L->readImages((char *)camName,0,nb-1, -1.0);
+    imagesCam=L->readImagesGray((char *)camName,0,nb-1, -1.0);
     if( imagesCam==NULL ) {
         printf("*** impossible de lire les images %s de 0 a %d\n",camName,nb-1);
         return(-1);
@@ -121,7 +121,7 @@ int doSimple(int nb,char *camName,char *refName) {
     delete[] imagesCam;
 
     Mat *imagesProj;
-    imagesProj=L->readImages(refName,0,nb-1, -1.0);
+    imagesProj=L->readImagesGray(refName,0,nb-1, -1.0);
     if( imagesProj==NULL ) {
         printf("*** impossible de lire les images %s de 0 a %d\n",refName,nb-1);
         return(-1);
@@ -189,10 +189,10 @@ void testLeopardChaima(string nameCam,  string nameProj,
     //Camera: Images / Code simple
     Mat *imagesCam;
     if(imgCam->rows != 0) {
-        imagesCam = L->readImages2(imgCam, from, from+nb-1);
+        imagesCam = L->convertToGray(imgCam, from, from+nb-1);
     }
     else {
-        imagesCam = L->readImages((char *) nameCam.c_str(), from, from+nb-1, -1.0);
+        imagesCam = L->readImagesGray((char *) nameCam.c_str(), from, from+nb-1, -1.0);
     }
     //computeMask(cam, img, nb, seuil, bias, step, xmin, xmax, ymin, ymax)
     L->computeMask(1,imagesCam,nb,0.23,5.0,1,-1,-1,-1,-1); //815,815+20,815,815+20
@@ -200,7 +200,7 @@ void testLeopardChaima(string nameCam,  string nameProj,
 
     //Projecteur: Images / Code simple
     Mat *imagesProj;
-    imagesProj=L->readImages((char *) nameProj.c_str(), 0, nb-1, -1.0);
+    imagesProj=L->readImagesGray((char *) nameProj.c_str(), 0, nb-1, -1.0);
     L->computeMask(0,imagesProj,nb,1.45,5.0,1,-1,-1,-1,-1); // toute l'image
     L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
 
@@ -415,7 +415,7 @@ int main(int argc, char *argv[]) {
     for(int i=1;i<argc;i++) {
         printf("....%s\n",argv[i]);
         if( strcmp("-h",argv[i])==0 ) {
-            printf("Usage: %s [-h] [-capture|-scan|-triangule] ou [-simple 60 cam%03d.png ref%03d.png]\n",argv[0]);
+            printf("Usage: %s [-h] [-capture|-scan|-triangule] ou [-simple 60 cam%%03d.png ref%%03d.png]\n",argv[0]);
             exit(0);
         }else if( strcmp("-capture",argv[i])==0 ) {
             doCapture=1;continue;
