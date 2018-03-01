@@ -184,7 +184,7 @@ void testLeopardChaima(string nameCam,  string nameProj,
     if(synchro)
         from = 0;
     else
-        from = 100;
+        from = 50;
 
     //Camera: Images / Code simple
     Mat *imagesCam;
@@ -195,7 +195,7 @@ void testLeopardChaima(string nameCam,  string nameProj,
         imagesCam = L->readImages((char *) nameCam.c_str(), from, from+nb-1, -1.0);
     }
     //computeMask(cam, img, nb, seuil, bias, step, xmin, xmax, ymin, ymax)
-    L->computeMask(1,imagesCam,nb,0.23,5.0,1,-1,-1,-1,-1); //815,815+20,815,815+20
+    L->computeMask(1,imagesCam,nb,1.0,5.0,1,-1,-1,-1,-1); //815,815+20,815,815+20
     L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
 
     //Projecteur: Images / Code simple
@@ -204,12 +204,11 @@ void testLeopardChaima(string nameCam,  string nameProj,
     L->computeMask(0,imagesProj,nb,1.45,5.0,1,-1,-1,-1,-1); // toute l'image
     L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
 
-    double timeFirst_s = horloge();
 
     //Cherche la premiere image de la séquence camera
     int posR = 0;
     L->prepareMatch();
-    posR = L->doShiftCodes();
+    posR = L->findFirstImage();
 
     srand(time(NULL));
 
@@ -217,67 +216,16 @@ void testLeopardChaima(string nameCam,  string nameProj,
     for(int i=0; i<nb; i++)
         imagesCamDecal[i] = imagesCam[(i+posR)%nb];
 
-    double timeFirst_e = horloge();
 
-   double timesp_s = horloge();
+    //trouvre la précédente ou la suivante
+    int compteur;
+    compteur = L->findPrevNext(imagesCamDecal, imagesProj, quad);
 
-    //Cherche le mix des images du projecteur
-    Mat *imagesProjMix=new Mat[nb];
-    int sumCostS=0, sumCostP=0;
-
-    //Match avec l'image suivante
-    L->prepareMatch();
-    for(int i=0; i<nb-1; i++)
-        imagesProjMix[i] = imagesProj[i]*0.5 + imagesProj[i+1]*0.5;
-    imagesProjMix[nb-1] = imagesProj[nb-1];
-
-    if(quad) {
-    //QUAD
-        L->computeCodes(1,LEOPARD_QUADRATIC,imagesCamDecal);
-        L->computeCodes(0,LEOPARD_QUADRATIC,imagesProjMix);
-    }
-    else {
-    //SIMPLE
-        L->computeCodes(1,LEOPARD_SIMPLE,imagesCamDecal);
-        L->computeCodes(0,LEOPARD_SIMPLE,imagesProjMix);
-    }
-
-    for(int j=0; j<10; j++)
-        L->doLsh(0,0);
-
-    sumCostS = L->sumCost();
-
-    //Match avec la précédente
-    L->prepareMatch();
-    for(int i=nb-1; i>0; i--)
-        imagesProjMix[i] = imagesProj[i]*0.5 + imagesProj[i-1]*0.5;
-    imagesProjMix[0] = imagesProj[0];
-
-    if(quad) {
-    //QUAD
-        L->computeCodes(1,LEOPARD_QUADRATIC,imagesCamDecal);
-        L->computeCodes(0,LEOPARD_QUADRATIC,imagesProjMix);
-    }
-    else {
-    //SIMPLE
-        L->computeCodes(1,LEOPARD_SIMPLE,imagesCamDecal);
-        L->computeCodes(0,LEOPARD_SIMPLE,imagesProjMix);
-    }
-
-    for(int j=0; j<10; j++)
-        L->doLsh(0,0);
-
-    sumCostP = L->sumCost();
-
-    printf("\n sumSuivante = %d, sumPrécédente = %d \n",sumCostS, sumCostP);
-
-    double timesp_e = horloge();
-
-    double timeMix_s = horloge();
 
     //Choix du mix
     L->prepareMatch();
-    if(sumCostS < sumCostP) {
+    Mat *imagesProjMix = new Mat[nb];
+    if(compteur == 1) {
         printf("\n match avec la suivante ! \n");
         for(double fct=0; fct<=1; fct+=0.1) {
             printf("\n\n---------------------- facteur = %.2f ----------------------\n\n", fct);
@@ -340,7 +288,6 @@ void testLeopardChaima(string nameCam,  string nameProj,
         }
     }
 
-    double timeMix_e = horloge();
     //L->forceBrute();
 
     Mat mixCam;
@@ -351,11 +298,6 @@ void testLeopardChaima(string nameCam,  string nameProj,
     imwrite(namelutP, lutProj);
     imwrite(namemixC, mixCam);
     imwrite(namemixP, mixProj);
-
-
-    printf("\n Time Firsy image = %f \n", timeFirst_e-timeFirst_s);
-    printf("\n Time previous or next = %f \n", timesp_e-timesp_s);
-    printf("\n Time match mix = %f \n", timeMix_e-timeMix_s);
 
     delete[] imagesCam;
     delete[] imagesCamDecal;
@@ -408,7 +350,7 @@ int main(int argc, char *argv[]) {
         doSp=0;
         synchro=0;
         quad=1;
-        nb=60;
+        nb=30;
     }
 
     // options

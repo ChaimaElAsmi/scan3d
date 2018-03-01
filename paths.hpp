@@ -7,7 +7,7 @@
 
 
 //Dossier principal pour contenir tous les output
-std::string path = "subpixel/";
+std::string path = "tests/test5/";
 #define NUM  ""
 #define CAP  "capture/"
 #define LUT  "output/scan/lut/"

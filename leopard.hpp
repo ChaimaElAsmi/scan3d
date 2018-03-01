@@ -127,10 +127,11 @@ class leopard {
     void makeLUT(cv::Mat &lut, cv::Mat &imgmix, int cam);
     int doLsh(int sp, unsigned char mix);
     int doHeuristique();
-    int doShiftCodes();
+    int findFirstImage();
     int sumCost();
     void statsCodes(int cam);
     void setPathL(int idx, std::string path, const char *filename);
+    int findPrevNext(cv::Mat *imagesCam, cv::Mat *imagesProj, int quad);
 
 
   private:

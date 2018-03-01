@@ -1157,22 +1157,6 @@ void leopard::shiftCodes (int shift, unsigned long *codes, int w, int h) {
         }
     }
 
-
-//    for(int i=0; i<w*h; i++) {
-//        //la fin du dernier code
-//        unsigned long mem = codes[i*nb+nb-1];
-//        int s = nbb%64;
-//        for(int j=nb-1; j>=0; j--) {
-//            if(j > 0) {
-//                codes[i*nb+j] = (codes[i*nb+j] >> shift) | (codes[i*nb+j-1] << (s - shift));
-//            }
-//            else {
-//                codes[i*nb+j] = (codes[i*nb+j] >> shift) | (mem << (s - shift));
-//            }
-//        s = 64;
-//        }
-//    }
-
     printf("\n");
     dumpCode(codes + (700*wc+wc/2) * nb);
     printf("\n");
@@ -1186,7 +1170,7 @@ int leopard::doShiftCodes() {
     printf("NA4\n");
 }
 #else
-int leopard::doShiftCodes() {
+int leopard::findFirstImage() {
     //create a file
 //    string const myFile("/home/chaima/Documents/Mathematica/SumT.txt");
 //    std::ofstream sumVide(myFile.c_str());
@@ -1261,6 +1245,66 @@ int leopard::doShiftCodes() {
     return pos;
 }
 #endif
+
+
+int leopard::findPrevNext(cv::Mat *imagesCam, cv::Mat *imagesProj, int quad) {
+    cv::Mat *imagesProjMix = new Mat[n];
+    int sumCostS=0, sumCostP=0;
+
+    //Match avec l'image suivante
+    prepareMatch();
+    printf("%d \n",n);
+    for(int i=0; i<n-1; i++)
+        imagesProjMix[i] = imagesProj[i]*0.5 + imagesProj[i+1]*0.5;
+    imagesProjMix[n-1] = imagesProj[n-1];
+
+    if(quad) { //QUAD
+        computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
+        computeCodes(0,LEOPARD_QUADRATIC,imagesProjMix);
+    }
+    else { //SIMPLE
+        computeCodes(1,LEOPARD_SIMPLE,imagesCam);
+        computeCodes(0,LEOPARD_SIMPLE,imagesProjMix);
+    }
+
+    for(int j=0; j<10; j++)
+        doLsh(0,0);
+
+    sumCostS = sumCost();
+
+
+    //Match avec la précédente
+    prepareMatch();
+    for(int i=nb-1; i>0; i--)
+        imagesProjMix[i] = imagesProj[i]*0.5 + imagesProj[i-1]*0.5;
+    imagesProjMix[0] = imagesProj[0];
+
+    if(quad) { //QUAD
+        computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
+        computeCodes(0,LEOPARD_QUADRATIC,imagesProjMix);
+    }
+    else { //SIMPLE
+        computeCodes(1,LEOPARD_SIMPLE,imagesCam);
+        computeCodes(0,LEOPARD_SIMPLE,imagesProjMix);
+    }
+
+    for(int j=0; j<10; j++)
+        doLsh(0,0);
+
+    sumCostP = sumCost();
+
+    //Choix de l'image
+    if(sumCostS < sumCostP) {
+        printf("\n match avec la suivante ! \n");
+        return 1;
+    }
+    else {
+        printf("\n match avec la précédente ! \n");
+        return -1;
+    }
+
+}
+
 
 #ifdef USE_GMP
 int leopard::heuristique(mpz_t *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
