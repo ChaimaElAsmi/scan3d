@@ -216,79 +216,12 @@ void testLeopardChaima(string nameCam,  string nameProj,
     for(int i=0; i<nb; i++)
         imagesCamDecal[i] = imagesCam[(i+posR)%nb];
 
-
     //trouvre la précédente ou la suivante
     int compteur;
     compteur = L->findPrevNext(imagesCamDecal, imagesProj, quad);
 
-
     //Choix du mix
-    L->prepareMatch();
-    Mat *imagesProjMix = new Mat[nb];
-    if(compteur == 1) {
-        printf("\n match avec la suivante ! \n");
-        for(double fct=0; fct<=1; fct+=0.1) {
-            printf("\n\n---------------------- facteur = %.2f ----------------------\n\n", fct);
-
-            for(int i=0; i<nb-1; i++)
-                imagesProjMix[i] = imagesProj[i]*(1-fct) + imagesProj[i+1]*fct;
-            imagesProjMix[nb-1] = imagesProj[nb-1];
-
-            if(quad) {
-            //QUAD
-                L->computeCodes(1,LEOPARD_QUADRATIC,imagesCamDecal);
-                L->computeCodes(0,LEOPARD_QUADRATIC,imagesProjMix);
-            }
-            else {
-            //SIMPLE
-                L->computeCodes(1,LEOPARD_SIMPLE,imagesCamDecal);
-                L->computeCodes(0,LEOPARD_SIMPLE,imagesProjMix);
-            }
-
-            //TEST: pas de cumul
-            //L->prepareMatch();
-            for(int j=0; j<20; j++)
-                L->doLsh(sp,(int) (fct*255));
-
-
-            //L->forceBrute(sp,(int) (fct*255));
-            if(synchro)
-                break;
-        }
-    }
-    else {
-        printf("\n match avec la précédente ! \n");
-        for(double fct=0; fct<=1; fct+=0.1) {
-            printf("\n\n---------------------- facteur = %.2f ----------------------\n\n", fct);
-
-            for(int i=nb-1; i>0; i--)
-            imagesProjMix[i] = imagesProj[i]*(1-fct) + imagesProj[i-1]*fct;
-            imagesProjMix[0] = imagesProj[0];
-
-            if(quad) {
-            //QUAD
-                L->computeCodes(1,LEOPARD_QUADRATIC,imagesCamDecal);
-                L->computeCodes(0,LEOPARD_QUADRATIC,imagesProjMix);
-            }
-            else {
-            //SIMPLE
-                L->computeCodes(1,LEOPARD_SIMPLE,imagesCamDecal);
-                L->computeCodes(0,LEOPARD_SIMPLE,imagesProjMix);
-            }
-
-            //TEST: pas de cumul
-            //L->prepareMatch();
-            for(int j=0; j<20; j++)
-                L->doLsh(sp,(int) (fct*255));
-
-
-            //L->forceBrute(sp,(int) (fct*255));
-            if(synchro)
-                break;
-        }
-    }
-
-    //L->forceBrute();
+    L->mix(imagesCamDecal, imagesProj, compteur, quad, sp, synchro);
 
     Mat mixCam;
     Mat mixProj;
@@ -302,7 +235,6 @@ void testLeopardChaima(string nameCam,  string nameProj,
     delete[] imagesCam;
     delete[] imagesCamDecal;
     delete[] imagesProj;
-    delete[] imagesProjMix;
     delete L;
     printf("----- leopard done -----\n");
 }

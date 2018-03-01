@@ -1315,6 +1315,48 @@ int leopard::findPrevNext(cv::Mat *imagesCam, cv::Mat *imagesProj, int quad) {
         return -1;
     }
 
+    delete[] imagesProjMix;
+}
+
+
+void leopard::mix(cv::Mat *imagesCam, cv::Mat *imagesProj, int compteur,int quad, int sp, int synchro) {
+    cv::Mat *imagesProjMix = new Mat[n];
+
+    prepareMatch();
+    for(double fct=0; fct<=1; fct+=0.1) {
+        printf("\n\n---------------------- facteur = %.2f ----------------------\n\n", fct);
+
+        if(compteur==1) {
+            for(int i=0; i<n-1; i++)
+                imagesProjMix[i] = imagesProj[i]*(1-fct) + imagesProj[i+1]*fct;
+            imagesProjMix[n-1] = imagesProj[n-1];
+        }
+        else {
+            for(int i=n-1; i>0; i--)
+                imagesProjMix[i] = imagesProj[i]*(1-fct) + imagesProj[i-1]*fct;
+            imagesProjMix[0] = imagesProj[0];
+        }
+
+        if(quad) { //QUAD
+            computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
+            computeCodes(0,LEOPARD_QUADRATIC,imagesProjMix);
+        }
+        else { //SIMPLE
+            computeCodes(1,LEOPARD_SIMPLE,imagesCam);
+            computeCodes(0,LEOPARD_SIMPLE,imagesProjMix);
+        }
+
+        //TEST: pas de cumul
+        //prepareMatch();
+        for(int j=0; j<20; j++)
+            doLsh(sp,(int) (fct*255));
+
+        //forceBrute(sp,(int) (fct*255));
+        if(synchro)
+            break;
+    }
+
+    delete[] imagesProjMix;
 }
 
 
