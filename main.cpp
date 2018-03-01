@@ -384,7 +384,7 @@ int main(int argc, char *argv[]) {
     int doSp=0;
     int synchro=0;
     int nb=0; //nombres d'images
-    int quad=0; //code quadratic à 1
+    int quad=0; //quadratic code = 1 , linear code = 0
 
     if( strcmp(user,"roys")==0 ) {
         // initialisations juste pour sebastien
