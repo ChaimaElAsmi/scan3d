@@ -89,8 +89,9 @@ double leopard::horloge() {
     return(1.5);
 }
 
-//On passe le nom des images
-cv::Mat *leopard::readImages(char *name,int from,int to, double fct) {
+
+//On passe le nom des images, tout est converti en gray
+cv::Mat *leopard::readImagesInterne(char *name,int from,int to, double fct,int flags) {
     printf("-- reading images %s --\n",name);
     int nb,i;
     char buf[300];
@@ -105,11 +106,11 @@ cv::Mat *leopard::readImages(char *name,int from,int to, double fct) {
         if( F==NULL ) return(NULL);
         fclose(F);
         if(fct>0) {
-            Mat tmp = imread(buf,CV_LOAD_IMAGE_GRAYSCALE);
+            Mat tmp = imread(buf,flags);
             resize(tmp, image[i],cvSize(0,0),0.5,0.5);
         }
         else{
-            image[i] = imread(buf,CV_LOAD_IMAGE_GRAYSCALE);
+            image[i] = imread(buf,flags);
         }
         //printf("loaded %d x %d\n",image[i].cols,image[i].rows);
         if( i==0 ) {
@@ -124,6 +125,16 @@ cv::Mat *leopard::readImages(char *name,int from,int to, double fct) {
         }
     }
     return image;
+}
+
+//On passe le nom des images, tout est converti en gray
+cv::Mat *leopard::readImagesGray(char *name,int from,int to, double fct) {
+    return leopard::readImagesInterne(name,from,to,fct,CV_LOAD_IMAGE_GRAYSCALE);
+}
+
+//On passe le nom des images, tout est converti en gray
+cv::Mat *leopard::readImagesBGR(char *name,int from,int to, double fct) {
+    return leopard::readImagesInterne(name,from,to,fct,CV_LOAD_IMAGE_COLOR);
 }
 
 
@@ -143,7 +154,8 @@ void leopard::noisify(cv::Mat *cam,int nb,double stddev,double mean) {
 
 
 //On passe les images directement
-cv::Mat *leopard::readImages2(Mat *cam,int from,int to) {
+// on copie seulement les elements entre from et to, inclusivement
+cv::Mat *leopard::convertToGray(Mat *cam,int from,int to) {
     printf("-- reading images camera --\n");
     int nb,i;
     nb=to-from+1;
