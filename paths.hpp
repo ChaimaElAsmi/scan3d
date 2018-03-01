@@ -7,7 +7,7 @@
 
 
 //Dossier principal pour contenir tous les output
-std::string path = "Dossier/";
+std::string path = "subpixel/";
 #define NUM  ""
 #define CAP  "capture/"
 #define LUT  "output/scan/lut/"
@@ -18,8 +18,8 @@ std::string path = "Dossier/";
     * FN_CAP_CAM  = images capturées camera
     * FN_CAP_PROJ = patterns de reference projecteur
 */
-#define FN_CAP_CAM  CAP "cam_%04d.jpg" //"capture/cam_%04d.jpg"
-#define FN_CAP_PROJ "../../Experiments/scan60/patterns/leopard_1280_720_%04d.jpg"
+#define FN_CAP_CAM  CAP "cam_%04d.jpg"
+#define FN_CAP_PROJ "patterns/leopard_1280_720_%04d.jpg"
 
 
 /* Scan:
@@ -31,14 +31,14 @@ std::string path = "Dossier/";
     * FN_SCAN_MEANP = image moyenne du projecteur
 */
 
-#define FN_SCAN_LUTC LUT "lutcam" NUM ".png"
+#define FN_SCAN_LUTC LUT "lutcam"  NUM ".png"
 #define FN_SCAN_LUTP LUT "lutproj" NUM ".png"
-#define FN_SCAN_MIXC LUT "mixcam" NUM ".png"
+#define FN_SCAN_MIXC LUT "mixcam"  NUM ".png"
 #define FN_SCAN_MIXP LUT "mixproj" NUM ".png"
 
-#define FN_SCAN_MASKC MASK "maskCam" NUM ".png"
+#define FN_SCAN_MASKC MASK "maskCam"  NUM ".png"
 #define FN_SCAN_MASKP MASK "maskProj" NUM ".png"
-#define FN_SCAN_MEANC MASK "meanCam" NUM ".png"
+#define FN_SCAN_MEANC MASK "meanCam"  NUM ".png"
 #define FN_SCAN_MEANP MASK "meanProj" NUM ".png"
 
 
@@ -50,8 +50,8 @@ std::string path = "Dossier/";
 */
 #define FN_TR_MASK  TRG "mask" NUM ".png"
 #define FN_TR_DATA  TRG "data" NUM ".xml"
-#define FN_TR_PARC  "Experiments/calibration/data/out_camera_data.xml"
-#define FN_TR_PARP  "Experiments/calibration/data/out_projector_data.xml"
+#define FN_TR_PARC  "calibration/out_camera_data.xml"
+#define FN_TR_PARP  "calibration/out_projector_data.xml"
 
 
 
