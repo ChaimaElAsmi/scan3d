@@ -12,7 +12,7 @@ endif()
 
 include_directories(${scan3d_SOURCE_DIR})
 
-add_executable(scan3d leopard.cpp triangulation.cpp main.cpp)
+add_executable(scan3d leopard.cpp triangulation.cpp unsync.cpp)
 target_link_libraries( scan3d ${OpenCV_LIBS} )
 install(TARGETS scan3d DESTINATION bin)
 

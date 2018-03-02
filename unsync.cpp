@@ -4,8 +4,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-
-
 #include <leopard.hpp>
 #include <triangulation.hpp>
 #include <paths.hpp>
@@ -24,145 +22,11 @@ double horloge() {
 }
 
 
-void testLeopardSeb() {
-    printf("----- test leopard seb -----\n");
+void scanLeopard(string nameCam,  string nameProj, string namelutC, string namelutP,
+                 string namemixC, string namemixP, Mat *imgCam, Mat &lutCam, Mat &lutProj,
+                 int nb, int quad, int sp, int synchro) {
 
-    printf("sizeof char %d\n",(int)sizeof(char));
-    printf("sizeof short %d\n",(int)sizeof(short));
-    printf("sizeof int %d\n",(int)sizeof(int));
-    printf("sizeof long %d\n",(int)sizeof(long));
-    printf("sizeof long long %d\n",(int)sizeof(long long));
-
-    leopard *L=new leopard();
-
-    // setup les output
-    string pathscan = "";
-    L->setPathL(IDX_SCAN_MASKC,pathscan,"maskcam.png");
-    L->setPathL(IDX_SCAN_MEANC,pathscan,"meancam.png");
-    L->setPathL(IDX_SCAN_MASKP,pathscan,"maskproj.png");
-    L->setPathL(IDX_SCAN_MEANP,pathscan,"meanproj.png");
-
-    /// lire des images
-    int nb=40;
-    Mat *imagesCam;
-    imagesCam=L->readImagesGray((char *)"data/cam1/cam%03d.jpg",0,nb-1, -1.0);
-    imwrite("cam0-nonoise.png",imagesCam[0]);
-    // noise  0 : p(erreur)=0.058
-    // noise 10 : p(erreur)=0.078
-    // noise 20 : p(erreur)=??
-    //L->noisify(imagesCam,nb,20.0,0.0);
-    imwrite("cam0-noise.png",imagesCam[0]);
-
-    L->computeMask(1,imagesCam,nb,1.45,5.0,1,-1,-1,-1,-1); // toute l'image
-    //L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
-    L->computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
-    delete[] imagesCam;
-
-    Mat *imagesProj;
-    imagesProj=L->readImagesGray((char *)"data/proj1/leopard_2560_1080_32B_%03d.jpg",0,nb-1, -1.0);
-    L->computeMask(0,imagesProj,nb,1.45,5.0,1,-1,-1,-1,-1); // toute l'image
-    //L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
-    L->computeCodes(0,LEOPARD_QUADRATIC,imagesProj);
-    delete[] imagesProj;
-
-    // quelques stats
-    //L->statsCodes(1);
-    //L->statsCodes(0);
-
-    L->prepareMatch();
-    //L->forceBrute();
-    for(int i=0;i<50;i++) {
-        printf("--- %d ---\n",i);
-        L->doLsh(0,0);
-        //L->doHeuristique();
-    }
-
-    cv::Mat lutCam;
-    cv::Mat lutProj;
-    cv::Mat mixCam;
-    cv::Mat mixProj;
-    L->makeLUT(lutCam,mixCam,1);
-    L->makeLUT(lutProj,mixProj,0);
-
-    imwrite("lutcam.png",lutCam);
-    imwrite("lutproj.png",lutProj);
-
-
-    printf("test\n");
-    delete L;
-    printf("----- done -----\n");
-}
-
-int doSimple(int nb,char *camName,char *refName) {
-    printf("----- match leopard simple -----\n");
-
-    leopard *L=new leopard();
-
-    // setup les output
-    string pathscan = "";
-    L->setPathL(IDX_SCAN_MASKC,pathscan,"maskcam.png");
-    L->setPathL(IDX_SCAN_MEANC,pathscan,"meancam.png");
-    L->setPathL(IDX_SCAN_MASKP,pathscan,"maskproj.png");
-    L->setPathL(IDX_SCAN_MEANP,pathscan,"meanproj.png");
-
-    /// lire des images
-    Mat *imagesCam;
-    imagesCam=L->readImagesGray((char *)camName,0,nb-1, -1.0);
-    if( imagesCam==NULL ) {
-        printf("*** impossible de lire les images %s de 0 a %d\n",camName,nb-1);
-        return(-1);
-    }
-    
-    L->computeMask(1,imagesCam,nb,0.1,5.0,1,970,1070,240,400); // toute l'image
-    //L->computeMask(1,imagesCam,nb,1.45,5.0,1,-1,-1,-1,-1); // toute l'image
-    //L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
-    L->computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
-    delete[] imagesCam;
-
-    Mat *imagesProj;
-    imagesProj=L->readImagesGray(refName,0,nb-1, -1.0);
-    if( imagesProj==NULL ) {
-        printf("*** impossible de lire les images %s de 0 a %d\n",refName,nb-1);
-        return(-1);
-    }
-    // normalement -1 pour ne pas mettre de limite
-    L->computeMask(0,imagesProj,nb,1.45,5.0,1,600,680,160,660); // toute l'image
-    //L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
-    L->computeCodes(0,LEOPARD_QUADRATIC,imagesProj);
-    delete[] imagesProj;
-
-    L->prepareMatch();
-    L->forceBruteProj(0,0);
-    // algo normal plus rapide
-    /*
-    for(int i=0;i<200;i++) {
-        printf("--- %d ---\n",i);
-        L->doLsh(0,0);
-    }
-    */
-
-    cv::Mat lutCam;
-    cv::Mat lutProj;
-    cv::Mat mixCam;
-    cv::Mat mixProj;
-    L->makeLUT(lutCam,mixCam,1);
-    L->makeLUT(lutProj,mixProj,0);
-
-    imwrite("lutcam.png",lutCam);
-    imwrite("lutproj.png",lutProj);
-
-    delete L;
-    printf("----- done -----\n");
-    return 0;
-}
-
-void testLeopardChaima(string nameCam,  string nameProj,
-                       string namelutC, string namelutP,
-                       string namemixC, string namemixP,
-                       Mat *imgCam, Mat &lutCam, Mat &lutProj,
-                       int nb, int quad, int sp, int synchro) {
-
-    printf("----- test leopard chaima -----\n");
+    printf("----- Scan leopard -----\n");
 
 
     printf("sizeof char %d\n",(int)sizeof(char));
@@ -240,6 +104,16 @@ void testLeopardChaima(string nameCam,  string nameProj,
 
 
 int main(int argc, char *argv[]) {
+
+    //Créer des directory pour stocker les output
+    string dir = "mkdir -p "
+                 +path+CAP+" "
+                 +path+LUT+" "
+                 +path+MASK+" "
+                 +path+TRG;
+    system(dir.c_str());
+
+
     Mat lutCam;
     Mat lutProj;
 
@@ -247,42 +121,15 @@ int main(int argc, char *argv[]) {
     string nameProj = path+FN_CAP_PROJ;
 
 
-    // qui est l'usager??
-    char *user=getenv("USER");
-    printf("Usager %s\n",user);
-
     int doCapture=0;
-    int doScan=0;
+    int doScan=1;
     int doTriangule=0;
     int doSp=0;
     int synchro=0;
-    int nb=0; //nombres d'images
-    int quad=0; //quadratic code = 1 , linear code = 0
+    int quad=1; //quadratic code = 1 , linear code = 0
+    int nb=30; //nombres d'images
+    int nbImages;
 
-    if( strcmp(user,"roys")==0 ) {
-        // initialisations juste pour sebastien
-        doCapture=0;
-        doScan=1;
-        doTriangule=0;
-    }else if(strcmp(user,"chaima")==0) {
-        // initialisations juste pour chaima
-
-        //Créer des directory pour stocker les images
-        string dir = "mkdir -p "
-                     +path+CAP+" "
-                     +path+LUT+" "
-                     +path+MASK+" "
-                     +path+TRG;
-        system(dir.c_str());
-
-        doCapture=0;
-        doScan=1;
-        doTriangule=0;
-        doSp=0;
-        synchro=0;
-        quad=1;
-        nb=30;
-    }
 
     // options
     for(int i=1;i<argc;i++) {
@@ -300,15 +147,10 @@ int main(int argc, char *argv[]) {
             doSp=1;continue;
         }else if( strcmp("-synchro",argv[i])==0 ) {
             synchro=1;continue;
-        }else if( strcmp("-simple",argv[i])==0 && i+4<argc ) {
-            // simple match entre deux ensembles d'images
-            // -simple 60 cam%03d.png ref%03d.png camMask.png
-            doSimple(atoi(argv[i+1]),argv[i+2],argv[i+3]);
-            exit(0);
         }
     }
 
-    int nbImages;
+
     if(synchro)
         nbImages=nb;
     else
@@ -337,10 +179,8 @@ int main(int argc, char *argv[]) {
             cout << "Camera ready" << endl;
         }
 
-//        srand(time(NULL));
-//        int random = rand() % 500000;
-//        cout << "random : " << random << endl;
-//        usleep(random);
+        double timeS = horloge();
+
         int offset=0;
         if(synchro){
             //On suppose que les images sont répétées 5 fois
@@ -373,10 +213,7 @@ int main(int argc, char *argv[]) {
             }
             printf("offset = %d \n",offset);
 
-        }
-
-        double timeS = horloge();
-        if(synchro){
+        //capture
             Mat vide;
             int i,j;
             for(i=0,j=0; j < nbImages; i++) {
@@ -387,7 +224,7 @@ int main(int argc, char *argv[]) {
                 else
                     cap >> vide;
             }
-        }else{
+        } else{
 
             for(int i = 0; i < nbImages; i++) {
                 cap >> img[i];
@@ -417,15 +254,9 @@ int main(int argc, char *argv[]) {
 
     /* ----------------------- Scan 3D ----------------------- */
     if( doScan ) {
-
-        if( strcmp(user,"roys")==0 ) {
-            testLeopardSeb();
-        }else if( strcmp(user,"chaima")==0 ) {
-            testLeopardChaima(nameCam, nameProj,
-                              (path+FN_SCAN_LUTC), (path+FN_SCAN_LUTP),
-                              (path+FN_SCAN_MIXC), (path+FN_SCAN_MIXP),
-                              img, lutCam, lutProj, nb, quad, doSp, synchro);
-        }
+        scanLeopard(nameCam, nameProj, (path+FN_SCAN_LUTC), (path+FN_SCAN_LUTP),
+                    (path+FN_SCAN_MIXC), (path+FN_SCAN_MIXP), img, lutCam, lutProj,
+                    nb, quad, doSp, synchro);
     }
     else {
         printf("----- Pas de scan -----\n");

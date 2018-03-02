@@ -1259,6 +1259,23 @@ int leopard::findFirstImage() {
 #endif
 
 
+int leopard::costPrevNext(cv::Mat *imagesCam, cv::Mat *imagesProj, int quad){
+
+    if(quad) { //QUAD
+        computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
+        computeCodes(0,LEOPARD_QUADRATIC,imagesProj);
+    }
+    else { //SIMPLE
+        computeCodes(1,LEOPARD_SIMPLE,imagesCam);
+        computeCodes(0,LEOPARD_SIMPLE,imagesProj);
+    }
+
+    for(int j=0; j<10; j++)
+        doLsh(0,0);
+
+    return sumCost();
+}
+
 int leopard::findPrevNext(cv::Mat *imagesCam, cv::Mat *imagesProj, int quad) {
     cv::Mat *imagesProjMix = new Mat[n];
     int sumCostS=0, sumCostP=0;
@@ -1270,19 +1287,7 @@ int leopard::findPrevNext(cv::Mat *imagesCam, cv::Mat *imagesProj, int quad) {
         imagesProjMix[i] = imagesProj[i]*0.5 + imagesProj[i+1]*0.5;
     imagesProjMix[n-1] = imagesProj[n-1];
 
-    if(quad) { //QUAD
-        computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
-        computeCodes(0,LEOPARD_QUADRATIC,imagesProjMix);
-    }
-    else { //SIMPLE
-        computeCodes(1,LEOPARD_SIMPLE,imagesCam);
-        computeCodes(0,LEOPARD_SIMPLE,imagesProjMix);
-    }
-
-    for(int j=0; j<10; j++)
-        doLsh(0,0);
-
-    sumCostS = sumCost();
+    sumCostS = costPrevNext(imagesCam, imagesProjMix, quad);
 
 
     //Match avec la précédente
@@ -1291,27 +1296,15 @@ int leopard::findPrevNext(cv::Mat *imagesCam, cv::Mat *imagesProj, int quad) {
         imagesProjMix[i] = imagesProj[i]*0.5 + imagesProj[i-1]*0.5;
     imagesProjMix[0] = imagesProj[0];
 
-    if(quad) { //QUAD
-        computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
-        computeCodes(0,LEOPARD_QUADRATIC,imagesProjMix);
-    }
-    else { //SIMPLE
-        computeCodes(1,LEOPARD_SIMPLE,imagesCam);
-        computeCodes(0,LEOPARD_SIMPLE,imagesProjMix);
-    }
-
-    for(int j=0; j<10; j++)
-        doLsh(0,0);
-
-    sumCostP = sumCost();
+    sumCostP = costPrevNext(imagesCam, imagesProjMix, quad);
 
     //Choix de l'image
     if(sumCostS < sumCostP) {
-        printf("\n match avec la suivante ! \n");
+        printf("\n Match avec la suivante ! \n");
         return 1;
     }
     else {
-        printf("\n match avec la précédente ! \n");
+        printf("\n Match avec la précédente ! \n");
         return -1;
     }
 
@@ -1346,7 +1339,7 @@ void leopard::mix(cv::Mat *imagesCam, cv::Mat *imagesProj, int compteur,int quad
             computeCodes(0,LEOPARD_SIMPLE,imagesProjMix);
         }
 
-        //TEST: pas de cumul
+        //TEST: pas de cumul -> uncomment prepareMatch();
         //prepareMatch();
         for(int j=0; j<20; j++)
             doLsh(sp,(int) (fct*255));

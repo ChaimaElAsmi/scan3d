@@ -134,6 +134,7 @@ class leopard {
     int sumCost();
     void statsCodes(int cam);
     void setPathL(int idx, std::string path, const char *filename);
+    int costPrevNext(cv::Mat *imagesCam, cv::Mat *imagesProj, int quad);
     int findPrevNext(cv::Mat *imagesCam, cv::Mat *imagesProj, int quad);
     void mix(cv::Mat *imagesCam, cv::Mat *imagesProj, int compteur, int quad, int sp, int synchro);
 
