@@ -36,6 +36,16 @@ class minfo {
 	//unsigned short active; // 1 = try to find this match, 0 = do not compute this match.
 };
 
+class leopard;
+
+// contient de l'information pour les threads
+class tinfo {
+    public:
+    leopard *L; // reference a la classe leopard, pour utiliser les contenus...
+    pthread_t thread;
+    int num; // trhread number (0,1,...nbT-1)
+    int from,to; // define the range of elements to process
+};
 
 // type de code binaire
 #define LEOPARD_SIMPLE  0
@@ -48,6 +58,9 @@ class minfo {
 #define IDX_SCAN_MEANP   3
 
 class leopard {
+
+    // temporaire en attendant de trouver comment partager avec tinfo
+    public:
 
     //
     // set by computeMask
@@ -105,6 +118,13 @@ class leopard {
     const char *fn_scan_meanc;
     const char *fn_scan_maskp;
     const char *fn_scan_meanp;
+
+    // multi-threading
+#ifdef USE_THREADS
+    int nbT; // number of threads
+    tinfo *T; // [nbT] info on threads
+    pthread_barrier_t barrier;
+#endif
 
     private:
     cv::Mat *readImagesInterne(char *name, int from, int to, double fct,int flags);

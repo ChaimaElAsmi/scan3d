@@ -3,6 +3,11 @@
 
 //#include <sys/time.h>
 
+#ifdef USE_THREADS
+    #include <sys/sysinfo.h>
+    #include <pthread.h>
+    #include <unistd.h>  // pour sleep()
+#endif
 
 //
 // pattern leopard
@@ -34,6 +39,23 @@ typedef struct {
 	unsigned int vmask; // voting mask (nv bits)
 } bminfo;
 
+void *print_message(void *args) {
+    tinfo *T=(tinfo *)args;
+
+    int s=rand()%10+2;
+    printf("Threading s=%d, num is %d, range=%d ... %d, n=%d\n",s,T->num,T->from,T->to,T->L->n);
+    sleep(s);
+    printf("Thread %d done first part.\n",T->num);
+
+    pthread_barrier_wait(&T->L->barrier);
+
+    printf("Thread %d resuming...\n",T->num);
+    sleep(rand()%10+1);
+    printf("Thread %d done second part.\n",T->num);
+
+}
+
+
 leopard::leopard() {
     printf("leopard init!\n");
     n=0;
@@ -56,6 +78,30 @@ leopard::leopard() {
     for(int i=0;i<65536;i++) bt[i]=bitCountOrig(i);
     //for(int i=0;i<65536;i++) printf("%3d : %3d\n",i,bt[i]);
     initSP();
+
+#ifdef USE_THREADS
+    printf("--- leopard multi-thread ---\n");
+    printf("This system has %d processors configured and %d processors available.\n",
+                get_nprocs_conf(), get_nprocs());
+    nbT=get_nprocs();
+
+    pthread_barrier_init(&barrier, NULL, nbT);
+
+    T=new tinfo[nbT];
+    for(int i=0;i<nbT;i++) {
+        T[i].num=i;
+        T[i].L=this;
+        T[i].from=i*10;
+        T[i].to=(i+1)*10-1;
+        pthread_create(&T[i].thread, NULL, &print_message, T+i);
+    }
+    sleep(1);
+    printf("waiting...\n");
+    for(int i=0;i<nbT;i++) {
+		int k=pthread_join(T[i].thread, NULL);
+	    printf("Joined with thread %d, k=%d\n",i,k);
+    }
+#endif
 }
 
 leopard::~leopard() {
