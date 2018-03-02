@@ -1,3 +1,4 @@
 *.o
 /build
 /captureV.pro.user
+/CMakeLists.txt.user
