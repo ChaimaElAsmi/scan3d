@@ -93,7 +93,6 @@ void testLeopardSeb() {
     printf("----- done -----\n");
 }
 
-
 int doSimple(int nb,char *camName,char *refName) {
     printf("----- match leopard simple -----\n");
 
@@ -376,8 +375,6 @@ int main(int argc, char *argv[]) {
 
         }
 
-
-
         double timeS = horloge();
         if(synchro){
             Mat vide;
@@ -395,7 +392,6 @@ int main(int argc, char *argv[]) {
             for(int i = 0; i < nbImages; i++) {
                 cap >> img[i];
                 printf("img %d \n",i);
-                //resize(img[i], resized[i], Size(640,480)); //(683,384)
             }
         }
         double timeE = horloge();
@@ -440,7 +436,7 @@ int main(int argc, char *argv[]) {
 
     /* ----------------------- Triangulation ----------------------- */
     if( doTriangule ) {
-        triangulation *T=new triangulation();
+        triangulation *T = new triangulation();
 
         string pathvide="";
         //Paths
