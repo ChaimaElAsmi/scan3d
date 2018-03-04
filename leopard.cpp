@@ -1,7 +1,8 @@
 #include <fstream>
 #include <leopard.hpp>
 
-//#include <sys/time.h>
+// pour l'horloge
+#include <sys/time.h>
 
 #ifdef USE_THREADS
     #include <sys/sysinfo.h>
@@ -33,17 +34,13 @@ int bitCountOrig(unsigned long n) {
     return (int)n;
 }
 
-typedef struct {
-	unsigned int byte; // 0..nb-1 (c'est en fait un unsigned long, donc max bits = 255*64=16384 bits
-	unsigned long mask; // 1,2,4,8......1L<<63
-	unsigned int vmask; // voting mask (nv bits)
-} bminfo;
 
+#ifdef USE_THREADS
 void *print_message(void *args) {
     tinfo *T=(tinfo *)args;
 
     int s=rand()%10+2;
-    printf("Threading s=%d, num is %d, range=%d ... %d, n=%d\n",s,T->num,T->from,T->to,T->L->n);
+    printf("Threading s=%d, num is %d, n=%d\n",s,T->num,T->L->n);
     sleep(s);
     printf("Thread %d done first part.\n",T->num);
 
@@ -54,6 +51,7 @@ void *print_message(void *args) {
     printf("Thread %d done second part.\n",T->num);
 
 }
+#endif
 
 
 leopard::leopard() {
@@ -84,10 +82,11 @@ leopard::leopard() {
     printf("This system has %d processors configured and %d processors available.\n",
                 get_nprocs_conf(), get_nprocs());
     nbT=get_nprocs();
+    T=new tinfo[nbT];
 
+    /*
     pthread_barrier_init(&barrier, NULL, nbT);
 
-    T=new tinfo[nbT];
     for(int i=0;i<nbT;i++) {
         T[i].num=i;
         T[i].L=this;
@@ -101,6 +100,7 @@ leopard::leopard() {
 		int k=pthread_join(T[i].thread, NULL);
 	    printf("Joined with thread %d, k=%d\n",i,k);
     }
+    */
 #endif
 }
 
@@ -109,15 +109,9 @@ leopard::~leopard() {
 	if( maskProj ) free(maskProj);
 	if( maskCam ) free(maskCam);
     if( codeCam ) {
-#ifdef USE_GMP
-        for(int i=0;i<wc*hc;i++) mpz_clear(codeCam[i]);
-#endif
         free(codeCam);
     }
     if( codeProj ) {
-#ifdef USE_GMP
-        for(int i=0;i<wp*hp;i++) mpz_clear(codeProj[i]);
-#endif
         free(codeProj);
     }
 	if( matchCam ) free(matchCam);
@@ -127,12 +121,10 @@ leopard::~leopard() {
 
 
 double leopard::horloge() {
-    /*
 	struct timeval tv;
 	gettimeofday(&tv,NULL);
 	return((double)tv.tv_sec+tv.tv_usec/1000000.0);
-    */
-    return(1.5);
+    //return(1.5);
 }
 
 
@@ -394,13 +386,6 @@ void leopard::computeMask(int cam,cv::Mat *img,int nb,double seuil,double bias,i
     }
 }
 
-#ifdef USE_GMP
-void leopard::dumpCode(mpz_t *c) {
-    int one=mpz_popcount(*c);
-    printf("%s [%d/%d] ", mpz_get_str (NULL, 2, *c),nbb-one,one);
-    //for(int i=0;i<nbb;i++) printf("%d",mpz_tstbit(*c,i));
-}
-#else
 void leopard::dumpCode(unsigned long *c) {
     int one=0;
 	for(int i=0;i<nbb;i++) {
@@ -410,154 +395,14 @@ void leopard::dumpCode(unsigned long *c) {
     }
     printf(" [%d/%d] ",nbb-one,one);
 }
-#endif
 
-#ifdef USE_GMP
-void leopard::dumpCodeNum(mpz_t *c) {
-    printf("%s\n", mpz_get_str (NULL,10, *c));
-}
-#else
 void leopard::dumpCodeNum(unsigned long *c) {
 	for(int b=0;b<nb;b++) {
         printf("%lu ",c[b]);
     }
     printf("\n");
 }
-#endif
 
-#ifdef USE_GMP
-void leopard::computeCodes(int cam,int type,cv::Mat *img) {
-    printf("-- compute codes cam=%d type=%d n=%d --\n",cam,type,n);
-
-    int w,h;
-    mpz_t *code=NULL; // [w*h*nb] [(y*w+x)*nb+b]
-    unsigned char *pmask;
-
-    if( cam ) {
-        w=wc;h=hc;
-        if( codeCam ) {
-            for(int i=0;i<wc*hc;i++) mpz_clear(codeCam[i]);
-            free(codeCam);
-        }
-        if( !maskCam ) { printf("cam: No mask to compute codes!\n");exit(0); }
-        pmask=maskCam;
-    }else{
-        w=wp;h=hp;
-        if( codeProj ) {
-            for(int i=0;i<wp*hp;i++) mpz_clear(codeProj[i]);
-            free(codeProj);
-        }
-        if( !maskProj ) { printf("proj: No mask to compute codes!\n");exit(0); }
-        pmask=maskProj;
-		printf("*** WP=%d HP=%d\n",wp,hp);
-    }
-
-
-    if( type==LEOPARD_SIMPLE ) {
-        // compare chaque image a l'image moyenne
-        nbb=n;
-        printf("nbb=%d\n",nbb);
-        code=(mpz_t *)malloc(w*h*sizeof(mpz_t));
-        for(int i=0;i<w*h;i++) mpz_init2(code[i],nbb);
-
-        // trouve l'image moyenne
-        cv::Mat sum;
-        sum.create(h,w,CV_32SC1);
-        int *psum=(int *)sum.data;
-		for(int j=0;j<w*h;j++) psum[j]=0;
-        for(int i=0;i<n;i++) {
-            unsigned char *p=img[i].data;
-            for(int j=0;j<w*h;j++) psum[j]+= *p++;
-        }
-        cv::Mat mean;
-        mean.create(h,w,CV_16UC1);
-        unsigned short *pmean=(unsigned short *)mean.data;
-        // 8 bits de precision
-        for(int j=0;j<w*h;j++) pmean[j]=(psum[j]*256*2+n)/(2*n);
-        //imwrite("meancode.png",mean);
-
-
-        int ambigu=0;
-        int count=0;
-        for(int j=0;j<w*h;j++) {
-            if( pmask[j]==0 ) continue; // tous les codes en dehors du mask sont 0
-            count++;
-            for(int i=0;i<n;i++) {
-                unsigned char *p=img[i].data;
-                unsigned short v=(p[j]<<8)|0x80;
-                if( v>pmean[j] || (v==pmean[j] && (rand()&1)) ) mpz_setbit(code[j],i);
-                if( v==pmean[j] ) { ambigu++; } // ne sert plus a rien
-            }
-            if( (j%w)==200 && (j/w)==300 ) {
-                printf("pixel (%d,%d) : ",j%w,j/w);
-                dumpCode(code+j);
-                printf("\n");
-            }
-        }
-
-        printf("count=%d (%d %%), ambigu=%d\n",count,count*100/(w*h),ambigu);
-    }else if( type==LEOPARD_QUADRATIC ) {
-        nbb=n*(n-1)/2; // quadratic!
-        printf("nbb=%d\n",nbb);
-        code=(mpz_t *)malloc(w*h*sizeof(mpz_t));
-
-        for(int i=0;i<w*h;i++) mpz_init2(code[i],nbb);
-
-        double t1=horloge();
-        int nbk=0; // compte les codes
-        for(int i=0;i<n;i++) {
-            printf("i=%d\n",i);
-            unsigned char *pi=img[i].data;
-
-            for(int j=i+1;j<n;j++) {
-                //printf("j=%d\n",j);
-                unsigned char *pj=img[j].data;
-                for(int k=0;k<w*h;k++) {
-                    if( pmask[k]==0 ) continue;
-                    if( pi[k]>pj[k] || (pi[k]==pj[k] && (nbk&1)) ) mpz_setbit(code[k],nbk);
-                }
-                nbk++;
-            }
-        }
-        double t2=horloge();
-        printf("duree=%12.6f\n",t2-t1);
-        //int j=900*w+1200;
-        int j = 200 * w + 300;
-        while( pmask[j]==0 ) j++;
-        printf("pixel %d (%d,%d) : ",j,j%w,j/w);
-        dumpCode(code+(j));
-        printf("\n");
-
-        /*
-        for(int i=0;i<w*h;i++) {
-            if( pmask[i]==0 ) continue;
-            dumpCodeNum(code+(i*nb));
-        }
-        */
-        /*
-        t1=horloge();
-        int i;
-        int nnn=0;
-        for(i=0;i<w*h;i+=1) {
-            j=w*h-1-i;
-            if( pmask[i]==0 || pmask[j]==0 ) continue;
-            int c=cost(code+i,code+j);
-            //printf("code %d et %d : %d\n",i,j,c);
-            nnn++;
-        }
-        t2=horloge();
-        printf("cost duree=%12.6f pour %d codes\n",t2-t1,nnn);
-        */
-    }
-
-    if( cam ) {
-        codeCam=code;
-    }else{
-        codeProj=code;
-    }
-}
-
-#else
 
 void leopard::computeCodes(int cam,int type,cv::Mat *img) {
     printf("-- compute codes cam=%d type=%d n=%d --\n",cam,type,n);
@@ -710,13 +555,7 @@ void leopard::computeCodes(int cam,int type,cv::Mat *img) {
 
 }
 
-#endif
 
-#ifdef USE_GMP
-void leopard::statsCodes(int cam) {
-    printf("NA0\n");
-}
-#else
 // cam:1=yes,0=no
 void leopard::statsCodes(int cam) {
 
@@ -780,7 +619,6 @@ void leopard::statsCodes(int cam) {
     }
     fclose(f);
 }
-#endif
 
 void leopard::prepareMatch() {
 	// les matchs
@@ -827,11 +665,6 @@ void leopard::unInitSP(){
     free(ptsProj);
 }
 
-#ifdef USE_GMP
-void leopard::unSousPixels(int i) {
-    printf("NA1\n");
-}
-#else
 //sousPixels pour le pixel i de la caméra
 //le point de départ caméra est un entier et le point d'arrivée projecteur est en sp
 void leopard::unSousPixels(int i) {
@@ -877,7 +710,6 @@ void leopard::unSousPixels(int i) {
     matchCam[i].subpy = (double) bestsy/n;
 
 }
-#endif
 
 void leopard::sousPixels() {
     for(int i=0; i<wc*hc; i++) {
@@ -885,11 +717,6 @@ void leopard::sousPixels() {
     }
 }
 
-#ifdef USE_GMP
-void leopard::forceBrute(int sp, unsigned char mix) {
-    printf("NA2\n");
-}
-#else
 void leopard::forceBrute(int sp, unsigned char mix) {
     double t1=horloge();
 	int step=wc*hc/100;
@@ -916,7 +743,6 @@ void leopard::forceBrute(int sp, unsigned char mix) {
     double t2=horloge();
     printf("temps=%12.6f\n",t2-t1);
 }
-#endif
 
 void leopard::forceBruteCam(int sp, unsigned char mix) {
     double t1=horloge();
@@ -973,21 +799,97 @@ void leopard::forceBruteProj(int sp, unsigned char mix) {
     printf("temps=%12.6f\n",t2-t1);
 }
 
+void leopard::lshInit(int nv)
+{
+	int nbvote=(1<<nv);
+	vote=(int *)realloc(vote,nbvote*sizeof(int));
+    int *q=vote;
+    for(int i=0;i<nbvote;i++) *q++=-1; // pas de vote!
+}
+
+#ifdef USE_THREADS
+void *leopard::parallel_lsh(void *args) {
+    tinfo *T=(tinfo *)args;
+    printf("LSH parallel T=%d/%d\n",T->num,T->L->nbT);
+    // on connait deja les bits qui seront utilises... T->bm
+    leopard *L=T->L;
+
+    // divise en nbT
+    // 0..b-1 en n parties
+    // b*i/n..b*(i+1)/n -1   (i=0..n-1, donc 0,1/n,2/n,...n-1/n)
+    //int start=wc*hc*T->num
+    int sz=L->wc*L->hc;
+    int start=T->num*sz/L->nbT;
+    int stop=(T->num+1)*sz/L->nbT -1;
+
+    //if( T->num==0 ) L->lshInit(T->nv);
+    //pthread_barrier_wait(&T->L->barrier);
+
+    L->lsh(start,stop,L->codeCam,L->matchCam,L->maskCam,L->wc,L->hc,L->codeProj,L->matchProj,L->maskProj,L->wp,L->hp,T->sp?1:-1,T->mix,T->nv,T->bm+0*T->nv);
+    pthread_barrier_wait(&T->L->barrier);
+    L->lsh(stop,start,L->codeCam,L->matchCam,L->maskCam,L->wc,L->hc,L->codeProj,L->matchProj,L->maskProj,L->wp,L->hp,T->sp?1:-1,T->mix,T->nv,T->bm+1*T->nv);
+    pthread_barrier_wait(&T->L->barrier);
+
+    sz=L->wp*L->hp;
+    start=T->num*sz/L->nbT;
+    stop=(T->num+1)*sz/L->nbT -1;
+
+    L->lsh(start,stop,L->codeProj,L->matchProj,L->maskProj,L->wp,L->hp,L->codeCam,L->matchCam,L->maskCam,L->wc,L->hc,T->sp?0:-1,T->mix,T->nv,T->bm+2*T->nv);
+    pthread_barrier_wait(&T->L->barrier);
+    L->lsh(stop,start,L->codeProj,L->matchProj,L->maskProj,L->wp,L->hp,L->codeCam,L->matchCam,L->maskCam,L->wc,L->hc,T->sp?0:-1,T->mix,T->nv,T->bm+3*T->nv);
+}
+#endif
+
 //sp : 1 = faire du sp
 //     0 = pas de sp
 //dans tous les cas, seulement la caméra qui a le sp
 //mix pour information seulement
 int leopard::doLsh(int sp, unsigned char mix) {
+    int nv=20; // nb de bits pour le vote
+	bminfo *bm=(bminfo *)malloc(nv*4*sizeof(bminfo)); // on choisi tout de suite les bits pour 4 lsh
+    choisiLshBits(bm+0*nv,nv);
+    choisiLshBits(bm+1*nv,nv);
+    choisiLshBits(bm+2*nv,nv);
+    choisiLshBits(bm+3*nv,nv);
+#ifdef USE_THREADS
+    pthread_barrier_init(&barrier, NULL, nbT);
+    // choisi d'avance tous les bits a choisir
+    
+    lshInit(nv); // alloc votes et clear votes
+
+    for(int i=0;i<nbT;i++) {
+        T[i].num=i;
+        T[i].L=this;
+        T[i].sp=sp;
+        T[i].mix=mix;
+        // on devrait mettre ca dans L, avec une mention temporaire
+        T[i].nv=nv; // la meme chose a tout le monde
+        T[i].bm=bm; // comme nv
+        pthread_create(&T[i].thread, NULL, &parallel_lsh, T+i);
+    }
+    //printf("waiting...\n");
+    for(int i=0;i<nbT;i++) {
+		int k=pthread_join(T[i].thread, NULL);
+	    //printf("Joined with thread %d, k=%d\n",i,k);
+    }
+#else
     // de cam vers proj, dans les deux directions
     //aisCam == 1
-    lsh(0,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp,sp?1:-1,mix);
-    lsh(1,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp,sp?1:-1,mix);
+    lshInit(nv);
+    lsh(0,wc*hc-1,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp,sp?1:-1,mix,nv,bm+0*nv);
+    lshInit(nv);
+    lsh(wc*hc-1,0,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp,sp?1:-1,mix,nv,bm+1*nv);
     // de proj vers cam, dans les deux directions
     //aisCam == 0
-    lsh(0,codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc,sp?0:-1,mix);
-    lsh(1,codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc,sp?0:-1,mix);
+    lshInit(nv);
+    lsh(0,wp*hp-1,codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc,sp?0:-1,mix,nv,bm+2*nv);
+    lshInit(nv);
+    lsh(wp*hp-1,0,codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc,sp?0:-1,mix,nv,bm+3*nv);
+#endif
+    free(bm);
     return 0;
 }
+
 
 
 int leopard::doHeuristique() {
@@ -996,51 +898,38 @@ int leopard::doHeuristique() {
     return 0;
 }
 
+// choisi nb bits au hasard
+void leopard::choisiLshBits(bminfo *bm,int nbit) {
+    // choisir nv bits au hasard
+	// pas ideal... ca peut repeter des bits...
+	for(int i=0;i<nbit;i++) {
+            int b=rand()%nbb; // the selected bit
+            bm[i].byte=b/64;
+            bm[i].mask=1L<<(b%64);
+            bm[i].vmask=1<<i;
+	}
+}
+
 
 //aisCam ==  1  ->  pour codeA est la cam
 //aisCam ==  0  ->  pour codeB est la cam
 //aisCam == -1  ->  pas de sp
 //mix= [0..255] seulement pour se rappeler du mix
-#ifdef USE_GMP
-int leopard::lsh(int dir,mpz_t *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
-                  mpz_t *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb,
-                 int aisCam, unsigned char mix) {
-#else
-int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
+int leopard::lsh(int start,int stop,unsigned long *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
                   unsigned long *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb,
-                 int aisCam, unsigned char mix) {
-#endif
-    int nv=20; // nb de bits pour le vote
-	int nbvote=(1<<nv);
-	bminfo bm[nv];
+                 int aisCam, unsigned char mix,int nv,bminfo *bm) {
+    // nv is the number of bits we use
+    // bm[nv] is the actual bit index choosen
 	double now=horloge();
 
     //printf("lsh nv=%d bits, allocate %d bytes\n",nv,((1<<nv)*sizeof(int)));
 
-	if( vote==NULL) vote=(int *)malloc(nbvote*sizeof(int));
-    int *q=vote;
-    for(int i=0;i<nbvote;i++) *q++=-1; // pas de vote!
-
-    // choisir nv bits au hasard
-	// pas ideal... ca peut repeter des bits...
-	for(int i=0;i<nv;i++) {
-            int b=rand()%nbb; // the selected bit
-#ifdef USE_GMP
-            bm[i].byte=b;
-#else
-            bm[i].byte=b/64;
-            bm[i].mask=1L<<(b%64);
-#endif
-            bm[i].vmask=1<<i;
-
-            //printf("bit %d mask=%d vmask=%d\n",i,bm[i].mask,bm[i].vmask);
-	}
 
     unsigned long *p;
 
-	int start,stop,step;
-	if( dir ) { start=0;stop=wa*ha;step=1; }
-	else		{ start=wa*ha-1;stop=-1;step=-1; }
+    // start et stop doivent etre en 0 et wa*ha-1
+
+	int step=(start<stop)?1:-1;
 
     int collision=0;
     int count=0;
@@ -1049,15 +938,10 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
             if( maskA[i]==0 ) continue;
 			// ramasse le hashcode
 			unsigned int hash=0;
-#ifdef USE_GMP
-            mpz_t *p=codeA+i;
-			for(int k=0;k<nv;k++) if( mpz_tstbit(*p,bm[k].byte) ) hash|=bm[k].vmask;
-#else
 			p=codeA+i*nb;
 			for(int k=0;k<nv;k++) {
                     if( p[bm[k].byte] & bm[k].mask ) hash|=bm[k].vmask;
 			}
-#endif
             //
             // flip un bit au hasard
             // pour reduire les collisions, et donc obtenir de meilleurs candidats
@@ -1084,9 +968,11 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
 	}
 
     // stats
+    /*
 	int holes=0;
 	for(int i=0;i<nbvote;i++) if( vote[i]<0 ) holes++;
 	printf("espace dans les votes = %d%%\n",(holes*100/nbvote));
+    */
 
     int vide=0;
 
@@ -1099,15 +985,10 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
 			if( maskB[i]==0 ) continue;
 			// ramasse le hashcode
 			unsigned int hash=0;
-#ifdef USE_GMP
-            mpz_t *p=codeB+i;
-			for(int k=0;k<nv;k++) if( mpz_tstbit(*p,bm[k].byte) ) hash|=bm[k].vmask;
-#else
 			p=codeB+i*nb;
 			for(int k=0;k<nv;k++) {
 				if( p[bm[k].byte]&bm[k].mask ) hash|=bm[k].vmask;
 			}
-#endif
 
 #ifdef EXTRA_ERREUR_BIT
             for(int k=-1;k<nv;k++) {
@@ -1124,11 +1005,7 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
                 if( j<0 ) {vide++; continue;} // aucun vote!
 
                 // match!
-#ifdef USE_GMP
-                int c=cost(codeA+j,codeB+i);
-#else
                 int c=cost(codeA+j*nb,codeB+i*nb);
-#endif
                 if( c<matchA[j].cost ) {
                     nbmatchA++;
                     redox+=matchA[j].cost-c;
@@ -1176,8 +1053,10 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
     for(int i=0;i<wb*hb;i++) if(matchB[i].cost<9999) {delta+=matchB[i].cost;nb++;}
 
 
+    /*
     printf("time=%12.6f  redox=%10d A=%4d B=%3d Hvide=%3d%% collisions=%3d%% vide= %d (%d,%d) nb= %d \n",
            now,redox,nbmatchA,nbmatchB,holes/(nbvote/100),collision/(count/100), vide,nbvote,count,nb);
+           */
     return(delta/(nb/1000));
 }
 
@@ -1191,11 +1070,6 @@ int leopard::sumCost() {
     return sum;
 }
 
-#ifdef USE_GMP
-void leopard::shiftCodes (int shift, mpz_t *codes, int w, int h) {
-    printf("NA3\n");
-}
-#else
 void leopard::shiftCodes (int shift, unsigned long *codes, int w, int h) {
     printf("\n Code Cam \n");
     dumpCode(codes + (700*wc+wc/2) * nb);
@@ -1220,14 +1094,8 @@ void leopard::shiftCodes (int shift, unsigned long *codes, int w, int h) {
     printf("\n");
     printf("\n");
 }
-#endif
 
 
-#ifdef USE_GMP
-int leopard::doShiftCodes() {
-    printf("NA4\n");
-}
-#else
 int leopard::findFirstImage() {
     //create a file
 //    string const myFile("/home/chaima/Documents/Mathematica/SumT.txt");
@@ -1241,12 +1109,18 @@ int leopard::findFirstImage() {
 
         int videCam=0, videProj=0;
         prepareMatch();
+
+        int nv=20; // nb de bits pour le vote
+        bminfo bm[nv]; // on choisi tout de suite les bits pour 4 lsh
+
         int k;
         for(k=0; k<2; k++) {
              srand(1656+k);
-            videCam += lsh(1,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp,-1,0);
+            choisiLshBits(bm,nv);
+            videCam += lsh(0,wc*hc-1,codeCam,matchCam,maskCam,wc,hc,codeProj,matchProj,maskProj,wp,hp,-1,0,nv,bm);
              srand(1678+k);
-            videProj += lsh(1,codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc,-1,0);
+            choisiLshBits(bm,nv);
+            videProj += lsh(0,wp*hp-1,codeProj,matchProj,maskProj,wp,hp,codeCam,matchCam,maskCam,wc,hc,-1,0,nv,bm);
         }
         sum[i] = (videCam + videProj)/(2*k);
         printf("\n sum[%d] = %d \n", i, sum[i]);
@@ -1302,7 +1176,6 @@ int leopard::findFirstImage() {
 
     return pos;
 }
-#endif
 
 
 int leopard::costPrevNext(cv::Mat *imagesCam, cv::Mat *imagesProj, int quad){
@@ -1399,12 +1272,6 @@ void leopard::mix(cv::Mat *imagesCam, cv::Mat *imagesProj, int compteur,int quad
 }
 
 
-#ifdef USE_GMP
-int leopard::heuristique(mpz_t *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
-						 mpz_t *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb) {
-    printf("na\n");
-}
-#else
 int leopard::heuristique(unsigned long *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
 						 unsigned long *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb) {
 	// pour chaque cam[i] -> proj[j]
@@ -1449,7 +1316,6 @@ int leopard::heuristique(unsigned long *codeA,minfo *matchA,unsigned char *maskA
     */
 	return(0);
 }
-#endif
 
 
 
@@ -1490,11 +1356,6 @@ unsigned long leopard::bitGen(int n)
 }
 */
 
-#ifdef USE_GMP
-int leopard::cost(mpz_t *a,mpz_t *b) {
-    return mpz_hamdist(*a,*b);
-}
-#else
 int leopard::cost(unsigned long *a,unsigned long *b) {
     //printf("A: ");dumpCode(a);printf("\n");
     //printf("B: ");dumpCode(b);printf("\n");
@@ -1503,7 +1364,6 @@ int leopard::cost(unsigned long *a,unsigned long *b) {
 	//printf("cost=%d\n",c);
     return c;
 }
-#endif
 
 void leopard::makeLUT(cv::Mat &lut,cv::Mat &imgmix,int cam) {
     if( cam )	{

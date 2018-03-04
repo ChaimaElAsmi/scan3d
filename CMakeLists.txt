@@ -2,6 +2,8 @@ cmake_minimum_required (VERSION 3.0)
 
 project (scan3d CXX)
 
+# Debug
+set(CMAKE_BUILD_TYPE Release)
 
 OPTION(SCAN3D_PARALLEL "Use parallel code" ON)
 

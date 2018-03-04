@@ -8,14 +8,6 @@
 #include <stdlib.h>
 
 //
-// definir pour utiliser gmp plutot que les codes maison
-//
-//#define USE_GMP
-
-#ifdef USE_GMP
-#include <gmp.h>
-#endif
-//
 // definir pour utiliser le vote extra qui simule un bit d'erreur
 //
 //#define EXTRA_ERREUR_BIT
@@ -38,14 +30,28 @@ class minfo {
 
 class leopard;
 
+
+typedef struct {
+    unsigned int byte; // 0..nb-1 (c'est en fait un unsigned long, donc max bits = 255*64=16384 bits
+    unsigned long mask; // 1,2,4,8......1L<<63
+    unsigned int vmask; // voting mask (nv bits)
+} bminfo;
+
 // contient de l'information pour les threads
 class tinfo {
     public:
     leopard *L; // reference a la classe leopard, pour utiliser les contenus...
     pthread_t thread;
     int num; // trhread number (0,1,...nbT-1)
-    int from,to; // define the range of elements to process
+    int nv; // nb de bits pour un LSH
+    bminfo *bm; // [4*nv] contient la selection de bits, pour 4 call de lsh d'un coup...
+    // parametres de doLsh
+    int sp;
+    unsigned char mix;
 };
+
+
+
 
 // type de code binaire
 #define LEOPARD_SIMPLE  0
@@ -82,18 +88,11 @@ class leopard {
 
     int nbb; // number of bits in the code (ex: 120)
 
-#ifdef USE_GMP
-	// codes for camera [wc*hc] access [y*wc+x] ou [i]
-	mpz_t *codeCam;
-	// codes for projector [wp*hp] access [y*wp+x] ou [i]
-	mpz_t *codeProj;
-#else
 	int nb; // number of long in the code =(nbb+63)/64
 	// codes for camera [wc*hc*nb] access [(y*wc+x)*nb+b] ou [i*nb+b]
 	unsigned long *codeCam;
 	// codes for projector [wp*hp*nb] access [(y*wp+x)*nb+b] ou [i*nb+b]
 	unsigned long *codeProj;
-#endif
 
 
 
@@ -105,6 +104,7 @@ class leopard {
 
 	// pour LSH
 	int *vote;
+    
 
 	cv::Mat minCam,maxCam;
 	cv::Mat minProj,maxProj;
@@ -128,6 +128,7 @@ class leopard {
 
     private:
     cv::Mat *readImagesInterne(char *name, int from, int to, double fct,int flags);
+    void choisiLshBits(bminfo *bm,int nb);
 
     public:
 	leopard(); //int w,int h, int nb, int freq, bool blur,string pid);
@@ -160,35 +161,22 @@ class leopard {
 
 
   private:
-#ifdef USE_GMP
-    void dumpCode(mpz_t *c);
-    void dumpCodeNum(mpz_t *c);
-	int cost(mpz_t *a,mpz_t *b);
-#else
     void dumpCode(unsigned long *c);
     void dumpCodeNum(unsigned long *c);
 	int cost(unsigned long *a,unsigned long *b);
-#endif
     double horloge();
     int bitCount(unsigned long n);
 	void match2image(cv::Mat &lut,minfo *match,unsigned char *mask,int w,int h,int ww,int hh);
     void mix2image(cv::Mat &imgmix,minfo *match,unsigned char *mask,int w,int h,int ww,int hh);
 
-#ifdef USE_GMP
-   int lsh(int dir, mpz_t *codeA, minfo *matchA, unsigned char *maskA, int wa, int ha,
-                     mpz_t *codeB, minfo *matchB, unsigned char *maskB, int wb, int hb,
-                     int aisCam, unsigned char mix);
-	int heuristique( mpz_t *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
-					 mpz_t *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb);
-    void shiftCodes(int shift, mpz_t *codes, int w, int h);
-#else
-    int lsh(int dir, unsigned long *codeA, minfo *matchA, unsigned char *maskA, int wa, int ha,
+    void lshInit(int nv);
+    static void *parallel_lsh(void *args);
+    int lsh(int start,int stop, unsigned long *codeA, minfo *matchA, unsigned char *maskA, int wa, int ha,
                      unsigned long *codeB, minfo *matchB, unsigned char *maskB, int wb, int hb,
-                     int aisCam, unsigned char mix);
+                     int aisCam, unsigned char mix,int nv,bminfo *bm);
 	int heuristique( unsigned long *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
 					 unsigned long *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb);
     void shiftCodes(int shift, unsigned long *codes, int w, int h);
-#endif
 
 
 	//unsigned char bitCount[256]; // precomputed bit count
