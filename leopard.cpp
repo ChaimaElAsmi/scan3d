@@ -748,25 +748,44 @@ void leopard::prepareMatch() {
         matchProj[i].subpx=0.0; matchProj[i].subpy=0.0; matchProj[i].mix=0; }
 }
 
-//test[w*w]
-double align(int* test, int* ref, double sx, double sy, int w) {
+
+// si dx et dy ne sont pas null, on retourne la derivee
+double align(int* test, int* ref, double sx, double sy, int w,double *dX,double *dY) {
     int dc=(sx>=0.0)?1:-1;
     int dr=(sy>=0.0)?w:-w;
     double fx=fabs(sx);
     double fy=fabs(sy);
     int sum=0;
+    double csx=0;
+    double csy=0;
+
     for(int r=1;r<w-1;r++) {
         for(int c=1;c<w-1;c++){
             int pos = r*w+c;
-            double v1 = test[pos]*(1-fx)+test[pos+dc]*fx;
-            double v2 = test[pos+dr]*(1-fx)+test[pos+dr+dc]*fx;
+            int ma,mb,mc,md;
+            ma=test[pos];
+            mb=test[pos+dc];
+            mc=test[pos+dr];
+            md=test[pos+dr+dc];
+            double v1 = ma*(1-fx)+mb*fx;
+            double v2 = mc*(1-fx)+md*fx;
             double v = v1*(1-fy)+v2*fy;
-            double d = v-ref[pos];
-            sum += d*d;
+            double dif = v-ref[pos];
+            sum += dif*dif;
+
+            // on ajoute le gradient!
+            double fsx=mb*(1-fy)-ma*(1-fy)+(md-mc)*fy;
+            double fsy=mc*(1-fx)-ma*(1-fx)+(md-mb)*fx;
+            // le gradient
+            csx+=2*dif*fsx;
+            csy+=2*dif*fsy;
         }
     }
+    if( dX ) *dX=csx;
+    if( dY ) *dY=csy;
     return sum;
 }
+
 
 
 
@@ -818,7 +837,7 @@ void leopard::unSousPixels(int i) {
     int bestsy=0;
     for(int sy=-(n-1);sy<n;sy++)
         for(int sx=-(n-1);sx<n;sx++){
-            double v = align(ptsCam, ptsProj, (double) sx/n, (double) sy/n, 2*wDecal+1);
+            double v = align(ptsCam, ptsProj, (double) sx/n, (double) sy/n, 2*wDecal+1,NULL,NULL);
             if(v<bestv || bestv<0){
                 bestv=v;
                 bestsx=sx;
