@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
     string nameProj = path+FN_CAP_PROJ;
 
 
-    int doCapture=1;
+    int doCapture=0;
     int doScan=0;
     int doTriangule=0;
     int doSp=0;
@@ -134,7 +134,8 @@ int main(int argc, char *argv[]) {
 
     // options
     for(int i=1;i<argc;i++) {
-        printf("->%s\n",argv[i]);
+
+        printf("--%s\n",argv[i]);
         if( strcmp("-h",argv[i])==0 ) {
             printf("Usage: %s [-h] [-capture|-scan|-triangule]\n",argv[0]);
             exit(0);
@@ -151,8 +152,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-
-    printf("testt \n");
+   printf("\n\n");
 
 
     if(synchro)
@@ -167,7 +167,9 @@ int main(int argc, char *argv[]) {
 
         printf("----- Capture -----\n");
 
-        VideoCapture cap(1);
+	system("raspivid -n -w 1280 -h 720 -b 10000000 -fps 30 -t 10000 -pf baseline -o test&");
+
+/*        VideoCapture cap(1);
         cap.set(CV_CAP_PROP_FRAME_WIDTH,1920);
         cap.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
         cap.set(CV_CAP_PROP_FPS,30);
@@ -252,7 +254,9 @@ int main(int argc, char *argv[]) {
             waitKey(30);
         }
         destroyWindow("Display Image");
-        printf("----- Capture done -----\n");
+*/  
+
+      printf("----- Capture done -----\n");
         printf("\n\n");
     }
 
