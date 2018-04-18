@@ -121,8 +121,8 @@ int main(int argc, char *argv[]) {
     string nameProj = path+FN_CAP_PROJ;
 
 
-    int doCapture=0;
-    int doScan=1;
+    int doCapture=1;
+    int doScan=0;
     int doTriangule=0;
     int doSp=0;
     int synchro=0;
@@ -131,11 +131,12 @@ int main(int argc, char *argv[]) {
     int nbImages;
 
 
+
     // options
     for(int i=1;i<argc;i++) {
-        printf("....%s\n",argv[i]);
+        printf("->%s\n",argv[i]);
         if( strcmp("-h",argv[i])==0 ) {
-            printf("Usage: %s [-h] [-capture|-scan|-triangule] ou [-simple 60 cam%%03d.png ref%%03d.png]\n",argv[0]);
+            printf("Usage: %s [-h] [-capture|-scan|-triangule]\n",argv[0]);
             exit(0);
         }else if( strcmp("-capture",argv[i])==0 ) {
             doCapture=1;continue;
@@ -149,6 +150,9 @@ int main(int argc, char *argv[]) {
             synchro=1;continue;
         }
     }
+
+
+    printf("testt \n");
 
 
     if(synchro)

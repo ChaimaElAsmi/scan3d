@@ -16,11 +16,3 @@ add_executable(unsync leopard.cpp triangulation.cpp unsync.cpp)
 target_link_libraries( unsync ${OpenCV_LIBS} )
 install(TARGETS unsync DESTINATION bin)
 
-add_executable(simple leopard.cpp triangulation.cpp simple.cpp)
-target_link_libraries( simple ${OpenCV_LIBS} )
-install(TARGETS simple DESTINATION bin)
-
-add_executable(couleur leopard.cpp triangulation.cpp couleur.cpp)
-target_link_libraries( couleur ${OpenCV_LIBS} )
-install(TARGETS couleur DESTINATION bin)
-
