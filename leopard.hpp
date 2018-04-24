@@ -7,14 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-//
-// definir pour utiliser gmp plutot que les codes maison
-//
-//#define USE_GMP
 
-#ifdef USE_GMP
-#include <gmp.h>
-#endif
 //
 // definir pour utiliser le vote extra qui simule un bit d'erreur
 //
@@ -68,19 +61,11 @@ class leopard {
     //
 
     int nbb; // number of bits in the code (ex: 120)
-
-#ifdef USE_GMP
-	// codes for camera [wc*hc] access [y*wc+x] ou [i]
-	mpz_t *codeCam;
-	// codes for projector [wp*hp] access [y*wp+x] ou [i]
-	mpz_t *codeProj;
-#else
 	int nb; // number of long in the code =(nbb+63)/64
 	// codes for camera [wc*hc*nb] access [(y*wc+x)*nb+b] ou [i*nb+b]
 	unsigned long *codeCam;
 	// codes for projector [wp*hp*nb] access [(y*wp+x)*nb+b] ou [i*nb+b]
 	unsigned long *codeProj;
-#endif
 
 
 
@@ -98,7 +83,9 @@ class leopard {
 
     //SousPixels
     int wDecal;
-    int *ptsCam,*ptsProj;
+    int dsx,dsy;
+    double *ptsCam,*ptsProj;
+    double *ptsCamx,*ptsCamy,*ptsCamxy;
 
     // filenames
     const char *fn_scan_maskc;
@@ -127,7 +114,7 @@ class leopard {
     void unSousPixels(int i);
     void initSP();
     void unInitSP();
-    void makeLUT(cv::Mat &lut, cv::Mat &imgmix, int cam);
+    void makeLUT(cv::Mat &lut, cv::Mat &imgmix, int cam, int select);
     int doLsh(int sp, unsigned char mix);
     int doHeuristique();
     int findFirstImage();
@@ -138,37 +125,25 @@ class leopard {
     int findPrevNext(cv::Mat *imagesCam, cv::Mat *imagesProj, int quad);
     void mix(cv::Mat *imagesCam, cv::Mat *imagesProj, int compteur, int quad, int sp, int synchro);
 
+    double squaredSum2(double sx, double sy, int w);
+    void alignGrad(double sx, double sy, int w,double *dX,double *dY);
+    void alignGrad2(double sx, double sy, int w,double *dX,double *dY);
 
   private:
-#ifdef USE_GMP
-    void dumpCode(mpz_t *c);
-    void dumpCodeNum(mpz_t *c);
-	int cost(mpz_t *a,mpz_t *b);
-#else
     void dumpCode(unsigned long *c);
     void dumpCodeNum(unsigned long *c);
 	int cost(unsigned long *a,unsigned long *b);
-#endif
     double horloge();
     int bitCount(unsigned long n);
-	void match2image(cv::Mat &lut,minfo *match,unsigned char *mask,int w,int h,int ww,int hh);
+    void match2image(cv::Mat &lut,minfo *match,unsigned char *mask,int w,int h,int ww,int hh,int select);
     void mix2image(cv::Mat &imgmix,minfo *match,unsigned char *mask,int w,int h,int ww,int hh);
-
-#ifdef USE_GMP
-   int lsh(int dir, mpz_t *codeA, minfo *matchA, unsigned char *maskA, int wa, int ha,
-                     mpz_t *codeB, minfo *matchB, unsigned char *maskB, int wb, int hb,
-                     int aisCam, unsigned char mix);
-	int heuristique( mpz_t *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
-					 mpz_t *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb);
-    void shiftCodes(int shift, mpz_t *codes, int w, int h);
-#else
     int lsh(int dir, unsigned long *codeA, minfo *matchA, unsigned char *maskA, int wa, int ha,
                      unsigned long *codeB, minfo *matchB, unsigned char *maskB, int wb, int hb,
                      int aisCam, unsigned char mix);
 	int heuristique( unsigned long *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
 					 unsigned long *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb);
     void shiftCodes(int shift, unsigned long *codes, int w, int h);
-#endif
+
 
 
 	//unsigned char bitCount[256]; // precomputed bit count

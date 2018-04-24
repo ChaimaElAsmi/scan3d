@@ -63,15 +63,9 @@ leopard::~leopard() {
 	if( maskProj ) free(maskProj);
 	if( maskCam ) free(maskCam);
     if( codeCam ) {
-#ifdef USE_GMP
-        for(int i=0;i<wc*hc;i++) mpz_clear(codeCam[i]);
-#endif
         free(codeCam);
     }
     if( codeProj ) {
-#ifdef USE_GMP
-        for(int i=0;i<wp*hp;i++) mpz_clear(codeProj[i]);
-#endif
         free(codeProj);
     }
 	if( matchCam ) free(matchCam);
@@ -348,13 +342,7 @@ void leopard::computeMask(int cam,cv::Mat *img,int nb,double seuil,double bias,i
     }
 }
 
-#ifdef USE_GMP
-void leopard::dumpCode(mpz_t *c) {
-    int one=mpz_popcount(*c);
-    printf("%s [%d/%d] ", mpz_get_str (NULL, 2, *c),nbb-one,one);
-    //for(int i=0;i<nbb;i++) printf("%d",mpz_tstbit(*c,i));
-}
-#else
+
 void leopard::dumpCode(unsigned long *c) {
     int one=0;
 	for(int i=0;i<nbb;i++) {
@@ -364,154 +352,15 @@ void leopard::dumpCode(unsigned long *c) {
     }
     printf(" [%d/%d] ",nbb-one,one);
 }
-#endif
 
-#ifdef USE_GMP
-void leopard::dumpCodeNum(mpz_t *c) {
-    printf("%s\n", mpz_get_str (NULL,10, *c));
-}
-#else
+
 void leopard::dumpCodeNum(unsigned long *c) {
 	for(int b=0;b<nb;b++) {
         printf("%lu ",c[b]);
     }
     printf("\n");
 }
-#endif
 
-#ifdef USE_GMP
-void leopard::computeCodes(int cam,int type,cv::Mat *img) {
-    printf("-- compute codes cam=%d type=%d n=%d --\n",cam,type,n);
-
-    int w,h;
-    mpz_t *code=NULL; // [w*h*nb] [(y*w+x)*nb+b]
-    unsigned char *pmask;
-
-    if( cam ) {
-        w=wc;h=hc;
-        if( codeCam ) {
-            for(int i=0;i<wc*hc;i++) mpz_clear(codeCam[i]);
-            free(codeCam);
-        }
-        if( !maskCam ) { printf("cam: No mask to compute codes!\n");exit(0); }
-        pmask=maskCam;
-    }else{
-        w=wp;h=hp;
-        if( codeProj ) {
-            for(int i=0;i<wp*hp;i++) mpz_clear(codeProj[i]);
-            free(codeProj);
-        }
-        if( !maskProj ) { printf("proj: No mask to compute codes!\n");exit(0); }
-        pmask=maskProj;
-		printf("*** WP=%d HP=%d\n",wp,hp);
-    }
-
-
-    if( type==LEOPARD_SIMPLE ) {
-        // compare chaque image a l'image moyenne
-        nbb=n;
-        printf("nbb=%d\n",nbb);
-        code=(mpz_t *)malloc(w*h*sizeof(mpz_t));
-        for(int i=0;i<w*h;i++) mpz_init2(code[i],nbb);
-
-        // trouve l'image moyenne
-        cv::Mat sum;
-        sum.create(h,w,CV_32SC1);
-        int *psum=(int *)sum.data;
-		for(int j=0;j<w*h;j++) psum[j]=0;
-        for(int i=0;i<n;i++) {
-            unsigned char *p=img[i].data;
-            for(int j=0;j<w*h;j++) psum[j]+= *p++;
-        }
-        cv::Mat mean;
-        mean.create(h,w,CV_16UC1);
-        unsigned short *pmean=(unsigned short *)mean.data;
-        // 8 bits de precision
-        for(int j=0;j<w*h;j++) pmean[j]=(psum[j]*256*2+n)/(2*n);
-        //imwrite("meancode.png",mean);
-
-
-        int ambigu=0;
-        int count=0;
-        for(int j=0;j<w*h;j++) {
-            if( pmask[j]==0 ) continue; // tous les codes en dehors du mask sont 0
-            count++;
-            for(int i=0;i<n;i++) {
-                unsigned char *p=img[i].data;
-                unsigned short v=(p[j]<<8)|0x80;
-                if( v>pmean[j] || (v==pmean[j] && (rand()&1)) ) mpz_setbit(code[j],i);
-                if( v==pmean[j] ) { ambigu++; } // ne sert plus a rien
-            }
-            if( (j%w)==200 && (j/w)==300 ) {
-                printf("pixel (%d,%d) : ",j%w,j/w);
-                dumpCode(code+j);
-                printf("\n");
-            }
-        }
-
-        printf("count=%d (%d %%), ambigu=%d\n",count,count*100/(w*h),ambigu);
-    }else if( type==LEOPARD_QUADRATIC ) {
-        nbb=n*(n-1)/2; // quadratic!
-        printf("nbb=%d\n",nbb);
-        code=(mpz_t *)malloc(w*h*sizeof(mpz_t));
-
-        for(int i=0;i<w*h;i++) mpz_init2(code[i],nbb);
-
-        double t1=horloge();
-        int nbk=0; // compte les codes
-        for(int i=0;i<n;i++) {
-            printf("i=%d\n",i);
-            unsigned char *pi=img[i].data;
-
-            for(int j=i+1;j<n;j++) {
-                //printf("j=%d\n",j);
-                unsigned char *pj=img[j].data;
-                for(int k=0;k<w*h;k++) {
-                    if( pmask[k]==0 ) continue;
-                    if( pi[k]>pj[k] || (pi[k]==pj[k] && (nbk&1)) ) mpz_setbit(code[k],nbk);
-                }
-                nbk++;
-            }
-        }
-        double t2=horloge();
-        printf("duree=%12.6f\n",t2-t1);
-        //int j=900*w+1200;
-        int j = 200 * w + 300;
-        while( pmask[j]==0 ) j++;
-        printf("pixel %d (%d,%d) : ",j,j%w,j/w);
-        dumpCode(code+(j));
-        printf("\n");
-
-        /*
-        for(int i=0;i<w*h;i++) {
-            if( pmask[i]==0 ) continue;
-            dumpCodeNum(code+(i*nb));
-        }
-        */
-        /*
-        t1=horloge();
-        int i;
-        int nnn=0;
-        for(i=0;i<w*h;i+=1) {
-            j=w*h-1-i;
-            if( pmask[i]==0 || pmask[j]==0 ) continue;
-            int c=cost(code+i,code+j);
-            //printf("code %d et %d : %d\n",i,j,c);
-            nnn++;
-        }
-        t2=horloge();
-        printf("cost duree=%12.6f pour %d codes\n",t2-t1,nnn);
-        */
-    }
-
-    if( cam ) {
-        codeCam=code;
-    }else{
-        codeProj=code;
-    }
-}
-
-#else
 
 void leopard::computeCodes(int cam,int type,cv::Mat *img) {
     printf("-- compute codes cam=%d type=%d n=%d --\n",cam,type,n);
@@ -664,13 +513,7 @@ void leopard::computeCodes(int cam,int type,cv::Mat *img) {
 
 }
 
-#endif
 
-#ifdef USE_GMP
-void leopard::statsCodes(int cam) {
-    printf("NA0\n");
-}
-#else
 // cam:1=yes,0=no
 void leopard::statsCodes(int cam) {
 
@@ -734,7 +577,7 @@ void leopard::statsCodes(int cam) {
     }
     fclose(f);
 }
-#endif
+
 
 void leopard::prepareMatch() {
 	// les matchs
@@ -750,19 +593,20 @@ void leopard::prepareMatch() {
 
 
 // si dx et dy ne sont pas null, on retourne la derivee
-double align(int* test, int* ref, double sx, double sy, int w,double *dX,double *dY) {
+//Somme des différences au carré
+double squaredSum(double* test, double* ref, double sx, double sy, int w) {
     int dc=(sx>=0.0)?1:-1;
     int dr=(sy>=0.0)?w:-w;
     double fx=fabs(sx);
     double fy=fabs(sy);
-    int sum=0;
+    double sum=0;
     double csx=0;
     double csy=0;
 
     for(int r=1;r<w-1;r++) {
         for(int c=1;c<w-1;c++){
             int pos = r*w+c;
-            int ma,mb,mc,md;
+            double ma,mb,mc,md;
             ma=test[pos];
             mb=test[pos+dc];
             mc=test[pos+dr];
@@ -773,43 +617,80 @@ double align(int* test, int* ref, double sx, double sy, int w,double *dX,double 
             double dif = v-ref[pos];
             sum += dif*dif;
 
-            // on ajoute le gradient!
-            double fsx=mb*(1-fy)-ma*(1-fy)+(md-mc)*fy;
-            double fsy=mc*(1-fx)-ma*(1-fx)+(md-mb)*fx;
-            // le gradient
-            csx+=2*dif*fsx;
-            csy+=2*dif*fsy;
+            //Grandient symbolique
+//            // on ajoute le gradient!
+//            double fsx=mb*(1-fy)-ma*(1-fy)+(md-mc)*fy;
+//            double fsy=mc*(1-fx)-ma*(1-fx)+(md-mb)*fx;
+//            // le gradient
+//            csx+=2*dif*fsx;
+//            csy+=2*dif*fsy;
         }
     }
-    if( dX ) *dX=csx;
-    if( dY ) *dY=csy;
-    return sum;
+//    if( dX ) *dX=csx;
+//    if( dY ) *dY=csy;
+    return sum/(w-2)/(w-2);
 }
 
+double leopard::squaredSum2(double sx, double sy, int w) {
+    return (squaredSum(ptsCam,ptsProj,sx,sy,w) +
+            squaredSum(ptsCamx,ptsProj,sx*(-1)/*dsx*/,sy,w) +
+            squaredSum(ptsCamy,ptsProj,sx,sy+dsy,w)*0 +
+            squaredSum(ptsCamxy,ptsProj,sx+dsx,sy+dsy,w)*0);
+}
+
+void leopard::alignGrad(double sx, double sy, int w,double *dX,double *dY) {
+    double e=0.01;
+
+    double x1 = squaredSum(ptsCam, ptsProj, sx+e, sy, w);
+    double x2 = squaredSum(ptsCam, ptsProj, sx-e, sy, w);
+
+    double y1 = squaredSum(ptsCam, ptsProj, sx, sy+e, w);
+    double y2 = squaredSum(ptsCam, ptsProj, sx, sy-e, w);
 
 
+    if(dX) *dX= (x1-x2)/(2*e);
+    if(dY) *dY= (y1-y2)/(2*e);
+
+}
+
+void leopard::alignGrad2(double sx, double sy, int w,double *dX,double *dY) {
+    double e=0.01;
+
+    double x1 = squaredSum2(sx+e, sy, w);
+    double x2 = squaredSum2(sx-e, sy, w);
+
+    double y1 = squaredSum2(sx, sy+e, w);
+    double y2 = squaredSum2(sx, sy-e, w);
+
+
+    if(dX) *dX= (x1-x2)/(2*e);
+    if(dY) *dY= (y1-y2)/(2*e);
+
+}
 
 void leopard::initSP() {
     wDecal=5;
-    ptsCam  = (int *) malloc((2*wDecal+1) * (2*wDecal+1) * sizeof(int));
-    ptsProj = (int *) malloc((2*wDecal+1) * (2*wDecal+1) * sizeof(int));
+    ptsCam  = (double *) malloc((2*wDecal+1) * (2*wDecal+1) * sizeof(double));
+    ptsCamx = (double *) malloc((2*wDecal+1) * (2*wDecal+1) * sizeof(double));
+    ptsCamy  = (double *) malloc((2*wDecal+1) * (2*wDecal+1) * sizeof(double));
+    ptsCamxy  = (double *) malloc((2*wDecal+1) * (2*wDecal+1) * sizeof(double));
+    ptsProj = (double *) malloc((2*wDecal+1) * (2*wDecal+1) * sizeof(double));
 }
 
-void leopard::unInitSP(){
+void leopard::unInitSP() {
     free(ptsCam);
+    free(ptsCamx);
+    free(ptsCamy);
+    free(ptsCamxy);
     free(ptsProj);
 }
 
-#ifdef USE_GMP
-void leopard::unSousPixels(int i) {
-    printf("NA1\n");
-}
-#else
+
 //sousPixels pour le pixel i de la caméra
 //le point de départ caméra est un entier et le point d'arrivée projecteur est en sp
 void leopard::unSousPixels(int i) {
 
-    if( i%wc==0 ) printf("%d\n",i/wc);
+    if( i%(wc*10)==0 ) printf("%d\n",i/wc);
     if( maskCam[i]==0 ) return;
     int j = matchCam[i].idx;
     int jy = j/wp;
@@ -826,43 +707,258 @@ void leopard::unSousPixels(int i) {
             //if( maskProj[jj]==0 ) continue;
             int c1  = cost(codeCam+i*nb,codeProj+jj*nb);
             int c2 = cost(codeProj+j*nb,codeProj+jj*nb);
-            ptsCam[pos] = c1;
-            ptsProj[pos] = c2;
+            ptsCam[pos] = (double) c1/nbb;
+            ptsProj[pos] = (double) c2/nbb;
         }
 
     //choisir le shift qui minimise le cout
-    int n = 5;
-    double bestv=-1.0;
-    int bestsx=0;
-    int bestsy=0;
-    for(int sy=-(n-1);sy<n;sy++)
-        for(int sx=-(n-1);sx<n;sx++){
-            double v = align(ptsCam, ptsProj, (double) sx/n, (double) sy/n, 2*wDecal+1,NULL,NULL);
-            if(v<bestv || bestv<0){
-                bestv=v;
-                bestsx=sx;
-                bestsy=sy;
+    //    double bestsx0,bestsy0;
+    //    {
+    //    int n = 5;
+    //    double bestv=-1.0;
+    //    int bestsx=0;
+    //    int bestsy=0;
+    //    double dX,dY;
+    //    for(int sy=-(n-1);sy<n;sy++)
+    //        for(int sx=-(n-1);sx<n;sx++){
+    //            double v = squaredSum(ptsCam, ptsProj, (double) sx/n, (double) sy/n, 2*wDecal+1);
+    //            //alignGrad(ptsCam, ptsProj, (double) sx/n, (double) sy/n, 2*wDecal+1, &dX, &dY);
+    //            if(v<bestv || bestv<0){
+    //                bestv=v;
+    //                bestsx=sx;
+    //                bestsy=sy;
+    //            }
+    ////            if(i==363854)  printf("sy= %2d sx= %2d v= %12.6f dx= %12.6f dy= %12.6f \n",sy,sx,v,dX,dY);
+    //        }
+    ////        if(bestsx==3 && bestsy==3)  printf("************************************ i= %d \n",i);
+    //    bestsx0= (double) bestsx/n;
+    //    bestsy0= (double) bestsy/n;
+    //    }
+
+
+    if(i==363814) {
+        FILE *f=fopen("/home/chaima/Documents/scanGit/scan3d/Project/subpixel/data/sum.txt","w");
+        int nstep=50;
+        double dX,dY;
+        for(int sy=-(nstep-1);sy<nstep;sy++)
+            for(int sx=-(nstep-1);sx<nstep;sx++){
+                double v = squaredSum(ptsCam, ptsProj, (double) sx/nstep, (double) sy/nstep, 2*wDecal+1);
+                 alignGrad((double) sx/nstep, (double) sy/nstep, 2*wDecal+1,&dX,&dY);
+                fprintf(f,"sy= %2d sx= %2d v= %12.6f dx= %12.6f dy=%12.6f\n",sy,sx,v,dX,dY);
             }
-            //printf("%f \n",v);
+        fclose(f);
+
+//        f=fopen("/home/chaima/Documents/scanGit/scan3d/Project/subpixel/data/points.txt","w");
+//        int pos = 0;
+//        for(int dr=-wDecal; dr<=wDecal; dr++)
+//            for(int dc=-wDecal; dc<=wDecal; dc++, pos++) {
+//                fprintf(f,"%12.6f %12.6f %12.6f %12.6f\n",ptsCam[pos],ptsProj[pos],ptsCam2[pos],ptsProj2[pos]);
+//            }
+//        fclose(f);
+    }
+
+////////////
+
+
+    int nmax=20;
+    double precision=5.0/10000;
+    double wMomentum=0.5;//0.25;
+
+    double dX,dY; //dérivée x,y
+    double prevdX,prevdY;
+    double sx=0.0; //subpixel en x
+    double sy=0.0; //subpixel en y
+    double bestsx=-10;
+    double bestsy=-10;
+    double bestsum=9999999999.0; //Meilleur souspixels, squaredSum
+    double Kx=100.0; //quadratic 30 -> 4000  ||  quadratic 60 -> 16000     stepsize
+    double Ky=100.0;
+    double sqSum=0;
+    double prevsx=-1000.0;
+    double prevsy=-1000.0;
+    double prevprevsx=-1000.0;
+    double prevprevsy=-1000.0;
+    double deltasx,deltasy;
+    double prevDeltasx=0.0;
+    double prevDeltasy=0.0;
+    int nItr=0;
+
+    while (true) {
+
+        sqSum = squaredSum(ptsCam, ptsProj, sx, sy, 2*wDecal+1);// + squaredSum(ptsCam2, ptsProj2, 1-sx, sy, 2*wDecal+1);
+        //printf("%2d sx= %12.6f sy= %12.6f v= %12.6f \n",nItr,sx,sy,sqSum);
+
+        if(sqSum<bestsum) {
+            bestsum=sqSum;
+            bestsx=sx;
+            bestsy=sy;
         }
 
-    matchCam[i].subpx = (double) bestsx/n;
-    matchCam[i].subpy = (double) bestsy/n;
+        alignGrad(sx, sy, 2*wDecal+1, &dX, &dY);
+
+        //step size calculé par BB. On rejette les deux premières itérations
+        if(nItr>1) {
+            Kx=((prevsx-prevprevsx) * (dX-prevdX)) / ((dX-prevdX)*(dX-prevdX)+(dY-prevdY)*(dY-prevdY));
+            Ky=((prevsy-prevprevsy) * (dY-prevdY)) / ((dX-prevdX)*(dX-prevdX)+(dY-prevdY)*(dY-prevdY));
+        }
+
+        deltasx=-dX*Kx;
+        deltasy=-dY*Ky;
+        sx+=deltasx+wMomentum*prevDeltasx; //je garde un pourcentage wMomentum de la dernière direction
+        sy+=deltasy+wMomentum*prevDeltasy;
+
+        if(i==363814 && 0)
+            printf("%2d sx= %12.6f sy= %12.6f v= %12.6f dx= %12.6f dy= %12.6f kx= %12.6f ky= %12.6f\n",
+                   nItr,sx,sy,sqSum,dX,dY,Kx,Ky);
+
+        nItr++;
+
+        if(nItr>nmax)  break;
+
+        if((sx>1.0) || (sx<-1.0) || (sy>1.0) || (sy<-1.0))  break;
+
+        if((fabs(sx-prevsx)<precision) && (fabs(sy-prevsy)<precision))  break;
+
+       // printf("dsx = %12.6f    dsy = %12.6f  \n",fabs(sx-prevsx),fabs(sy-prevsy));
+        prevprevsx=prevsx;
+        prevprevsy=prevsy;
+        prevsx=sx;
+        prevsy=sy;
+        prevdX=dX;
+        prevdY=dY;
+        prevDeltasx=deltasx;
+        prevDeltasy=deltasy;
+
+    }
+
+
+    //Phase 2
+
+   //printf("Initial: sx= %12.6f sy= %12.6f v= %12.6f \n",bestsx,bestsy,bestsum);
+
+ if(1) {
+
+
+    pos = 0;
+    int ddc=(bestsx>=0)?1:-1;
+    int ddr=(bestsy>=0)?wc:-wc;
+    dsx=(bestsx>=0)?-1:1;
+    dsy=(bestsy>=0)?-1:1;
+
+    for(int dr=-wDecal; dr<=wDecal; dr++)
+        for(int dc=-wDecal; dc<=wDecal; dc++, pos++) {
+
+            int jj = j+dc+dr*wp;
+            //if( maskProj[jj]==0 ) continue;
+            int cx  = cost(codeCam+(i+ddc)*nb,codeProj+jj*nb);
+            int cy  = cost(codeCam+(i+ddr)*nb,codeProj+jj*nb);
+            int cxy  = cost(codeCam+(i+ddc+ddr)*nb,codeProj+jj*nb);
+            ptsCamx[pos] = (double) cx/nbb;
+            ptsCamy[pos] = (double) cy/nbb;
+            ptsCamxy[pos] = (double) cxy/nbb;
+        }
+
+    if(i==363814) {
+//        FILE *f=fopen("/home/chaima/Documents/scanGit/scan3d/Project/subpixel/data/sum.txt","w");
+//        int nstep=50;
+//        double dX,dY;
+//        for(int sy=-(nstep-1);sy<nstep;sy++)
+//            for(int sx=-(nstep-1);sx<nstep;sx++){
+//                double v = squaredSum(ptsCam, ptsProj, (double) sx/nstep, (double) sy/nstep, 2*wDecal+1);
+//                 alignGrad((double) sx/nstep, (double) sy/nstep, 2*wDecal+1,&dX,&dY);
+//                fprintf(f,"sy= %2d sx= %2d v= %12.6f dx= %12.6f dy=%12.6f\n",sy,sx,v,dX,dY);
+//            }
+//        fclose(f);
+
+        FILE *f=fopen("/home/chaima/Documents/scanGit/scan3d/Project/subpixel/data/points2.txt","w");
+        int pos = 0;
+        for(int dr=-wDecal; dr<=wDecal; dr++)
+            for(int dc=-wDecal; dc<=wDecal; dc++, pos++) {
+                fprintf(f,"%12.6f %12.6f %12.6f %12.6f %12.6f\n",ptsCam[pos],ptsCamx[pos],ptsCamy[pos],ptsCamxy[pos],ptsProj[pos]);
+            }
+        fclose(f);
+    }
+
+
+    //Refaire la descente avec 4 surfaces
+    nmax=20;
+    precision=5.0/10000;
+    wMomentum=0.5;//0.25;
+
+    sx=bestsx;
+    sy=bestsy;
+    bestsum=9999999999.0; //Meilleur souspixels, squaredSum
+    Kx=100.0; //quadratic 30 -> 4000  ||  quadratic 60 -> 16000     stepsize
+    Ky=100.0;
+    sqSum=0;
+    prevsx=-1000.0;
+    prevsy=-1000.0;
+    prevprevsx=-1000.0;
+    prevprevsy=-1000.0;
+    prevDeltasx=0.0;
+    prevDeltasy=0.0;
+    nItr=0;
+
+    while (true) {
+
+        sqSum = squaredSum2(sx, sy, 2*wDecal+1);
+
+        if(sqSum<bestsum) {
+            bestsum=sqSum;
+            bestsx=sx;
+            bestsy=sy;
+        }
+
+        alignGrad2(sx, sy, 2*wDecal+1, &dX, &dY);
+
+       if(nItr>1) {
+            Kx=((prevsx-prevprevsx) * (dX-prevdX)) / ((dX-prevdX)*(dX-prevdX)+(dY-prevdY)*(dY-prevdY));
+            Ky=((prevsy-prevprevsy) * (dY-prevdY)) / ((dX-prevdX)*(dX-prevdX)+(dY-prevdY)*(dY-prevdY));
+        }
+
+        deltasx=-dX*Kx;
+        deltasy=-dY*Ky;
+        sx+=deltasx+wMomentum*prevDeltasx;
+        sy+=deltasy+wMomentum*prevDeltasy;
+
+        nItr++;
+
+        if(nItr>nmax)  break;
+
+        if((sx>1.0) || (sx<-1.0) || (sy>1.0) || (sy<-1.0))  break;
+
+        if((fabs(sx-prevsx)<precision) && (fabs(sy-prevsy)<precision))  break;
+
+        prevprevsx=prevsx;
+        prevprevsy=prevsy;
+        prevsx=sx;
+        prevsy=sy;
+        prevdX=dX;
+        prevdY=dY;
+        prevDeltasx=deltasx;
+        prevDeltasy=deltasy;
+
+    }
+
+ }
+     //printf("Final: sx= %12.6f sy= %12.6f v= %12.6f \n",bestsx,bestsy,bestsum);
+
+    matchCam[i].subpx = bestsx;
+    matchCam[i].subpy = bestsy;
+    //    if(i==363854)
+    //        printf("\n\n");
 
 }
-#endif
+
 
 void leopard::sousPixels() {
+
     for(int i=0; i<wc*hc; i++) {
         unSousPixels(i);
     }
 }
 
-#ifdef USE_GMP
-void leopard::forceBrute(int sp, unsigned char mix) {
-    printf("NA2\n");
-}
-#else
+
 void leopard::forceBrute(int sp, unsigned char mix) {
     double t1=horloge();
 	int step=wc*hc/100;
@@ -889,7 +985,7 @@ void leopard::forceBrute(int sp, unsigned char mix) {
     double t2=horloge();
     printf("temps=%12.6f\n",t2-t1);
 }
-#endif
+
 
 void leopard::forceBruteCam(int sp, unsigned char mix) {
     double t1=horloge();
@@ -974,15 +1070,10 @@ int leopard::doHeuristique() {
 //aisCam ==  0  ->  pour codeB est la cam
 //aisCam == -1  ->  pas de sp
 //mix= [0..255] seulement pour se rappeler du mix
-#ifdef USE_GMP
-int leopard::lsh(int dir,mpz_t *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
-                  mpz_t *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb,
-                 int aisCam, unsigned char mix) {
-#else
 int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
                   unsigned long *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb,
                  int aisCam, unsigned char mix) {
-#endif
+
     int nv=20; // nb de bits pour le vote
 	int nbvote=(1<<nv);
 	bminfo bm[nv];
@@ -998,12 +1089,8 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
 	// pas ideal... ca peut repeter des bits...
 	for(int i=0;i<nv;i++) {
             int b=rand()%nbb; // the selected bit
-#ifdef USE_GMP
-            bm[i].byte=b;
-#else
             bm[i].byte=b/64;
             bm[i].mask=1L<<(b%64);
-#endif
             bm[i].vmask=1<<i;
 
             //printf("bit %d mask=%d vmask=%d\n",i,bm[i].mask,bm[i].vmask);
@@ -1022,21 +1109,14 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
             if( maskA[i]==0 ) continue;
 			// ramasse le hashcode
 			unsigned int hash=0;
-#ifdef USE_GMP
-            mpz_t *p=codeA+i;
-			for(int k=0;k<nv;k++) if( mpz_tstbit(*p,bm[k].byte) ) hash|=bm[k].vmask;
-#else
 			p=codeA+i*nb;
 			for(int k=0;k<nv;k++) {
                     if( p[bm[k].byte] & bm[k].mask ) hash|=bm[k].vmask;
 			}
-#endif
+
             //
             // flip un bit au hasard
             // pour reduire les collisions, et donc obtenir de meilleurs candidats
-#ifdef REDUCTION_COLLISIONS
-            hash^=(1<<(rand()%nv));
-#endif
 
             //if( hash<0 || hash>=nbvote ) { printf("******* out of bound %d vs %d\n",hash,nbvote);continue; }
 
@@ -1072,15 +1152,11 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
 			if( maskB[i]==0 ) continue;
 			// ramasse le hashcode
 			unsigned int hash=0;
-#ifdef USE_GMP
-            mpz_t *p=codeB+i;
-			for(int k=0;k<nv;k++) if( mpz_tstbit(*p,bm[k].byte) ) hash|=bm[k].vmask;
-#else
 			p=codeB+i*nb;
 			for(int k=0;k<nv;k++) {
 				if( p[bm[k].byte]&bm[k].mask ) hash|=bm[k].vmask;
 			}
-#endif
+
 
 #ifdef EXTRA_ERREUR_BIT
             for(int k=-1;k<nv;k++) {
@@ -1097,11 +1173,7 @@ int leopard::lsh(int dir,unsigned long *codeA,minfo *matchA,unsigned char *maskA
                 if( j<0 ) {vide++; continue;} // aucun vote!
 
                 // match!
-#ifdef USE_GMP
-                int c=cost(codeA+j,codeB+i);
-#else
                 int c=cost(codeA+j*nb,codeB+i*nb);
-#endif
                 if( c<matchA[j].cost ) {
                     nbmatchA++;
                     redox+=matchA[j].cost-c;
@@ -1164,11 +1236,7 @@ int leopard::sumCost() {
     return sum;
 }
 
-#ifdef USE_GMP
-void leopard::shiftCodes (int shift, mpz_t *codes, int w, int h) {
-    printf("NA3\n");
-}
-#else
+
 void leopard::shiftCodes (int shift, unsigned long *codes, int w, int h) {
     printf("\n Code Cam \n");
     dumpCode(codes + (700*wc+wc/2) * nb);
@@ -1193,14 +1261,8 @@ void leopard::shiftCodes (int shift, unsigned long *codes, int w, int h) {
     printf("\n");
     printf("\n");
 }
-#endif
 
 
-#ifdef USE_GMP
-int leopard::doShiftCodes() {
-    printf("NA4\n");
-}
-#else
 int leopard::findFirstImage() {
     //create a file
 //    string const myFile("/home/chaima/Documents/Mathematica/SumT.txt");
@@ -1275,7 +1337,7 @@ int leopard::findFirstImage() {
 
     return pos;
 }
-#endif
+
 
 
 int leopard::costPrevNext(cv::Mat *imagesCam, cv::Mat *imagesProj, int quad){
@@ -1360,7 +1422,7 @@ void leopard::mix(cv::Mat *imagesCam, cv::Mat *imagesProj, int compteur,int quad
 
         //TEST: pas de cumul -> uncomment prepareMatch();
         //prepareMatch();
-        for(int j=0; j<20; j++)
+        for(int j=0; j<30; j++)
             doLsh(sp,(int) (fct*255));
 
         //forceBrute(sp,(int) (fct*255));
@@ -1372,12 +1434,6 @@ void leopard::mix(cv::Mat *imagesCam, cv::Mat *imagesProj, int compteur,int quad
 }
 
 
-#ifdef USE_GMP
-int leopard::heuristique(mpz_t *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
-						 mpz_t *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb) {
-    printf("na\n");
-}
-#else
 int leopard::heuristique(unsigned long *codeA,minfo *matchA,unsigned char *maskA,int wa,int ha,
 						 unsigned long *codeB,minfo *matchB,unsigned char *maskB,int wb,int hb) {
 	// pour chaque cam[i] -> proj[j]
@@ -1422,7 +1478,6 @@ int leopard::heuristique(unsigned long *codeA,minfo *matchA,unsigned char *maskA
     */
 	return(0);
 }
-#endif
 
 
 
@@ -1463,11 +1518,7 @@ unsigned long leopard::bitGen(int n)
 }
 */
 
-#ifdef USE_GMP
-int leopard::cost(mpz_t *a,mpz_t *b) {
-    return mpz_hamdist(*a,*b);
-}
-#else
+
 int leopard::cost(unsigned long *a,unsigned long *b) {
     //printf("A: ");dumpCode(a);printf("\n");
     //printf("B: ");dumpCode(b);printf("\n");
@@ -1476,21 +1527,21 @@ int leopard::cost(unsigned long *a,unsigned long *b) {
 	//printf("cost=%d\n",c);
     return c;
 }
-#endif
 
-void leopard::makeLUT(cv::Mat &lut,cv::Mat &imgmix,int cam) {
+
+void leopard::makeLUT(cv::Mat &lut,cv::Mat &imgmix,int cam,int select) {
     if( cam )	{
-        match2image(lut,matchCam,maskCam,wc,hc,wp,hp);
+        match2image(lut,matchCam,maskCam,wc,hc,wp,hp,select);
         mix2image(imgmix,matchCam,maskCam,wc,hc,wp,hp);
     }
     else {
-        match2image(lut,matchProj,maskProj,wp,hp,wc,hc);
+        match2image(lut,matchProj,maskProj,wp,hp,wc,hc,select);
         mix2image(imgmix,matchProj,maskProj,wp,hp,wc,hc);
     }
 }
 
 // output une image pour le match (imager w x h) vers une image ww x hh
-void leopard::match2image(cv::Mat &lut,minfo *match,unsigned char *mask,int w,int h,int ww,int hh) {
+void leopard::match2image(cv::Mat &lut,minfo *match,unsigned char *mask,int w,int h,int ww,int hh, int select) {
     lut.create(h,w,CV_16UC3);
     int x,y,xx,yy,cc,dxx,dyy;
     int i=0;
@@ -1501,6 +1552,10 @@ void leopard::match2image(cv::Mat &lut,minfo *match,unsigned char *mask,int w,in
         cc=match[i].cost;
         dxx=(int) (match[i].subpx*65535);
         dyy=(int) (match[i].subpy*65535);
+        if(fabs(select)) {
+            if(dxx*select<0)  dxx=0;
+            if(dyy*select<0)  dyy=0;
+        }
         //lut->at<Vec3s>(y,x)=Vec3s((xx*65535)/ww,(yy*65535)/hh,(cc*65535)/maxcost);
         if( mask[i]==0 ) {
             lut.at<Vec3s>(y,x)=Vec3s( 65535, 0, 0);

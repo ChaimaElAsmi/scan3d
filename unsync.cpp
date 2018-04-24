@@ -22,6 +22,76 @@ double horloge() {
 }
 
 
+void subpixel(string nameCam, string nameProj, string namelutC,
+              string namelutP, Mat &lutCam, Mat &lutProj, int nb, int quad) {
+
+    printf("----- Scan leopard subpixel -----\n");
+
+
+    printf("sizeof char %d\n",(int)sizeof(char));
+    printf("sizeof short %d\n",(int)sizeof(short));
+    printf("sizeof int %d\n",(int)sizeof(int));
+    printf("sizeof long %d\n",(int)sizeof(long));
+    printf("sizeof long long %d\n",(int)sizeof(long long));
+
+    leopard *L=new leopard();
+
+    // setup les filename
+    L->setPathL(IDX_SCAN_MASKC,path,FN_SCAN_MASKC);
+    L->setPathL(IDX_SCAN_MEANC,path,FN_SCAN_MEANC);
+    L->setPathL(IDX_SCAN_MASKP,path,FN_SCAN_MASKP);
+    L->setPathL(IDX_SCAN_MEANP,path,FN_SCAN_MEANP);
+
+    //Camera
+    int from=0;
+    Mat *imagesCam;
+    imagesCam = L->readImagesGray((char *) nameCam.c_str(), from, from+nb-1, -1.0);
+    L->computeMask(1,imagesCam,nb,1.0,5.0,1,-1,-1,-1,-1);
+    if(quad)
+        L->computeCodes(1,LEOPARD_QUADRATIC,imagesCam);
+    else
+        L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
+    delete[] imagesCam;
+
+    //Projector
+    Mat *imagesProj;
+    imagesProj=L->readImagesGray((char *) nameProj.c_str(), 0, nb-1, -1.0);
+    L->computeMask(0,imagesProj,nb,1.45,5.0,1,-1,-1,-1,-1);
+    if(quad)
+        L->computeCodes(0,LEOPARD_QUADRATIC,imagesProj);
+    else
+        L->computeCodes(0,LEOPARD_SIMPLE,imagesProj);
+    delete[] imagesProj;
+
+    L->prepareMatch();
+    for(int i=0;i<20;i++) {
+        printf("--- %d ---\n",i);
+        L->doLsh(0,0);
+    }
+
+    L->sousPixels();
+
+    Mat mixCam;
+    Mat mixProj;
+    L->makeLUT(lutCam,mixCam,1,-1);
+    L->makeLUT(lutProj,mixProj,0,-1);
+    imwrite(namelutC+"neg.png", lutCam);
+    imwrite(namelutP+"neg.png", lutProj);
+    L->makeLUT(lutCam,mixCam,1,1);
+    L->makeLUT(lutProj,mixProj,0,1);
+    imwrite(namelutC+"pos.png", lutCam);
+    imwrite(namelutP+"pos.png", lutProj);
+    L->makeLUT(lutCam,mixCam,1,0);
+    L->makeLUT(lutProj,mixProj,0,0);
+    imwrite(namelutC, lutCam);
+    imwrite(namelutP, lutProj);
+
+
+    delete L;
+    printf("----- leopard subpixel done -----\n");
+
+}
+
 void scanLeopard(string nameCam,  string nameProj, string namelutC, string namelutP,
                  string namemixC, string namemixP, Mat *imgCam, Mat &lutCam, Mat &lutProj,
                  int nb, int quad, int sp, int synchro) {
@@ -47,7 +117,7 @@ void scanLeopard(string nameCam,  string nameProj, string namelutC, string namel
     if(synchro)
         from = 0;
     else
-        from = 50;
+        from = 0;//100;
 
     //Camera: Images / Code simple
     Mat *imagesCam;
@@ -88,8 +158,8 @@ void scanLeopard(string nameCam,  string nameProj, string namelutC, string namel
 
     Mat mixCam;
     Mat mixProj;
-    L->makeLUT(lutCam,mixCam,1);
-    L->makeLUT(lutProj,mixProj,0);
+    L->makeLUT(lutCam,mixCam,1,0);
+    L->makeLUT(lutProj,mixProj,0,0);
     imwrite(namelutC, lutCam);
     imwrite(namelutP, lutProj);
     imwrite(namemixC, mixCam);
@@ -122,14 +192,13 @@ int main(int argc, char *argv[]) {
 
 
     int doCapture=0;
-    int doScan=1;
+    int doScan=0;
     int doTriangule=0;
     int doSp=0;
     int synchro=0;
     int quad=1; //quadratic code = 1 , linear code = 0
-    int nb=30; //nombres d'images
+    int nb=60; //nombres d'images
     int nbImages;
-
 
     // options
     for(int i=1;i<argc;i++) {
@@ -149,6 +218,9 @@ int main(int argc, char *argv[]) {
             synchro=1;continue;
         }
     }
+
+    //Subpixel
+    subpixel(nameCam, nameProj, (path+FN_SCAN_LUTC), (path+FN_SCAN_LUTP), lutCam, lutProj, nb, quad);
 
 
     if(synchro)

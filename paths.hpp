@@ -7,9 +7,9 @@
 
 
 //Dossier principal pour contenir tous les output
-std::string path = "../Project/tests/test5/";
-#define NUM  ""
-#define CAP  "capture/"
+std::string path = "../Project/subpixel/scan60/";
+#define NUM  "_q2"
+#define CAP  ""
 #define LUT  "output/scan/lut/"
 #define MASK "output/scan/mask/"
 #define TRG  "output/triangulation/"
@@ -18,8 +18,8 @@ std::string path = "../Project/tests/test5/";
     * FN_CAP_CAM  = images capturées camera
     * FN_CAP_PROJ = patterns de reference projecteur
 */
-#define FN_CAP_CAM  CAP "cam_%04d.jpg"
-#define FN_CAP_PROJ "patterns/leopard_1280_720_%04d.jpg"
+#define FN_CAP_CAM  CAP "../patternsModif25/leopardModif_1280_720_%04d.jpg"//"cam_%04d.jpg"
+#define FN_CAP_PROJ "../patterns/leopard_1280_720_%04d.jpg"
 
 
 /* Scan:

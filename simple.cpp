@@ -81,8 +81,8 @@ void testLeopardSeb() {
     cv::Mat lutProj;
     cv::Mat mixCam;
     cv::Mat mixProj;
-    L->makeLUT(lutCam,mixCam,1);
-    L->makeLUT(lutProj,mixProj,0);
+    L->makeLUT(lutCam,mixCam,1,0);
+    L->makeLUT(lutProj,mixProj,0,0);
 
     imwrite("lutcam.png",lutCam);
     imwrite("lutproj.png",lutProj);
@@ -146,8 +146,8 @@ int doSimple(int nb,char *camName,char *refName) {
     cv::Mat lutProj;
     cv::Mat mixCam;
     cv::Mat mixProj;
-    L->makeLUT(lutCam,mixCam,1);
-    L->makeLUT(lutProj,mixProj,0);
+    L->makeLUT(lutCam,mixCam,1,0);
+    L->makeLUT(lutProj,mixProj,0,0);
 
     imwrite("lutcam.png",lutCam);
     imwrite("lutproj.png",lutProj);
@@ -225,8 +225,8 @@ void testLeopardChaima(string nameCam,  string nameProj,
 
     Mat mixCam;
     Mat mixProj;
-    L->makeLUT(lutCam,mixCam,1);
-    L->makeLUT(lutProj,mixProj,0);
+    L->makeLUT(lutCam,mixCam,1,0);
+    L->makeLUT(lutProj,mixProj,0,0);
     imwrite(namelutC, lutCam);
     imwrite(namelutP, lutProj);
     imwrite(namemixC, mixCam);
