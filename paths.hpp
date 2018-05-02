@@ -7,19 +7,19 @@
 
 
 //Dossier principal pour contenir tous les output
-std::string path = "../Project/tests/test5/";
+std::string path = "/home/chaima/Documents/raspberryPi/capture/";
 #define NUM  ""
-#define CAP  "capture/"
-#define LUT  "output/scan/lut/"
-#define MASK "output/scan/mask/"
-#define TRG  "output/triangulation/"
+#define CAP  "leop2/"
+#define LUT  "output2/scan/lut/"
+#define MASK "output2/scan/mask/"
+#define TRG  "output2/triangulation/"
 
 /* Capture:
     * FN_CAP_CAM  = images capturées camera
     * FN_CAP_PROJ = patterns de reference projecteur
 */
-#define FN_CAP_CAM  CAP "cam_%04d.jpg"
-#define FN_CAP_PROJ "patterns/leopard_1280_720_%04d.jpg"
+#define FN_CAP_CAM  CAP "%08d.png"
+#define FN_CAP_PROJ "../../scanGit/scan3d/Project/Experiments/scan60/patterns/leopard_1280_720_%04d.jpg"
 
 
 /* Scan:

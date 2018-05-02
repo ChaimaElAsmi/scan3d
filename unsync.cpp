@@ -58,7 +58,7 @@ void scanLeopard(string nameCam,  string nameProj, string namelutC, string namel
         imagesCam = L->readImagesGray((char *) nameCam.c_str(), from, from+nb-1, -1.0);
     }
     //computeMask(cam, img, nb, seuil, bias, step, xmin, xmax, ymin, ymax)
-    L->computeMask(1,imagesCam,nb,1.0,5.0,1,-1,-1,-1,-1); //815,815+20,815,815+20
+    L->computeMask(1,imagesCam,nb,0.6,5.0,1,-1,-1,-1,-1); //815,815+20,815,815+20
     L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
 
     //Projecteur: Images / Code simple
@@ -121,13 +121,13 @@ int main(int argc, char *argv[]) {
     string nameProj = path+FN_CAP_PROJ;
 
 
-    int doCapture=1;
-    int doScan=0;
+    int doCapture=0;
+    int doScan=1;
     int doTriangule=0;
     int doSp=0;
     int synchro=0;
     int quad=1; //quadratic code = 1 , linear code = 0
-    int nb=30; //nombres d'images
+    int nb=60; //nombres d'images
     int nbImages;
 
 
@@ -150,9 +150,6 @@ int main(int argc, char *argv[]) {
             synchro=1;continue;
         }
     }
-
-
-    printf("testt \n");
 
 
     if(synchro)
