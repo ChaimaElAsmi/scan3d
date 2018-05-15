@@ -7,19 +7,19 @@
 
 
 //Dossier principal pour contenir tous les output
-std::string path = "/home/chaima/Documents/raspberryPi/capture/";
+std::string path = "../Project/calibconf/";
 #define NUM  ""
-#define CAP  "leop2/"
-#define LUT  "output2/scan/lut/"
-#define MASK "output2/scan/mask/"
-#define TRG  "output2/triangulation/"
+#define CAP  "capture/modeles"
+#define LUT  "output/scan/lut/"
+#define MASK "output/scan/mask/"
+#define TRG  "output/triangulation/"
 
 /* Capture:
     * FN_CAP_CAM  = images capturées camera
     * FN_CAP_PROJ = patterns de reference projecteur
 */
-#define FN_CAP_CAM  CAP "%08d.png"
-#define FN_CAP_PROJ "../../scanGit/scan3d/Project/Experiments/scan60/patterns/leopard_1280_720_%04d.jpg"
+#define FN_CAP_CAM  CAP NUM "/%08d.png"
+#define FN_CAP_PROJ "../../Project/patterns/leopard_1280_720_%04d.jpg"
 
 
 /* Scan:
@@ -48,10 +48,10 @@ std::string path = "/home/chaima/Documents/raspberryPi/capture/";
     * FN_TR_PARC  = paramètres internes/externes de la camera
     * FN_TR_PARP = paramètres internes/externes du projecteur
 */
-#define FN_TR_MASK  TRG "mask" NUM ".png"
-#define FN_TR_DATA  TRG "data" NUM ".xml"
-#define FN_TR_PARC  "calibration/out_camera_data.xml"
-#define FN_TR_PARP  "calibration/out_projector_data.xml"
+#define FN_TR_MASK  TRG "mask2" NUM ".png"
+#define FN_TR_DATA  TRG "data2" NUM ".xml"
+#define FN_TR_PARC  "data/out_camera_data.xml"
+#define FN_TR_PARP  "data/out_projector_data.xml"
 
 
 

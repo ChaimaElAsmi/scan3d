@@ -47,7 +47,7 @@ void scanLeopard(string nameCam,  string nameProj, string namelutC, string namel
     if(synchro)
         from = 0;
     else
-        from = 50;
+        from = 1;
 
     //Camera: Images / Code simple
     Mat *imagesCam;
@@ -58,7 +58,7 @@ void scanLeopard(string nameCam,  string nameProj, string namelutC, string namel
         imagesCam = L->readImagesGray((char *) nameCam.c_str(), from, from+nb-1, -1.0);
     }
     //computeMask(cam, img, nb, seuil, bias, step, xmin, xmax, ymin, ymax)
-    L->computeMask(1,imagesCam,nb,0.6,5.0,1,-1,-1,-1,-1); //815,815+20,815,815+20
+    L->computeMask(1,imagesCam,nb,0.9,5.0,1,-1,-1,-1,-1); //815,815+20,815,815+20
     L->computeCodes(1,LEOPARD_SIMPLE,imagesCam);
 
     //Projecteur: Images / Code simple
@@ -122,8 +122,8 @@ int main(int argc, char *argv[]) {
 
 
     int doCapture=0;
-    int doScan=1;
-    int doTriangule=0;
+    int doScan=0;
+    int doTriangule=1;
     int doSp=0;
     int synchro=0;
     int quad=1; //quadratic code = 1 , linear code = 0
@@ -274,8 +274,8 @@ int main(int argc, char *argv[]) {
         //Paths
         T->setPathT(IDX_TR_MASK,path,FN_TR_MASK);
         T->setPathT(IDX_TR_DATA,path,FN_TR_DATA);
-        T->setPathT(IDX_TR_PARC,pathvide,FN_TR_PARC);
-        T->setPathT(IDX_TR_PARP,pathvide,FN_TR_PARP);
+        T->setPathT(IDX_TR_PARC,path,FN_TR_PARC);
+        T->setPathT(IDX_TR_PARP,path,FN_TR_PARP);
 
         T->triangulate(lutCam, lutProj);
         delete T;
