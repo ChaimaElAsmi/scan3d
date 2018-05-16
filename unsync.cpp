@@ -152,12 +152,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
-<<<<<<< HEAD
-=======
-   printf("\n\n");
-
->>>>>>> 1a85270242e8f0c64092d2f34bcacd386a6dbf1f
-
     if(synchro)
         nbImages=nb;
     else
