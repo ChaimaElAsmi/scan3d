@@ -28,8 +28,10 @@ triangulation::triangulation() {
     poseMatrix_cam = Mat::zeros(3, 4, CV_64F);
 
     // strings pour les filename
-    fn_tr_mask=NULL;
-    fn_tr_data=NULL;
+    fn_tr_mask_cam=NULL;
+    fn_tr_mask_proj=NULL;
+    fn_tr_data_cam=NULL;
+    fn_tr_data_proj=NULL;
     fn_tr_parc=NULL;
     fn_tr_parp=NULL;
 
@@ -96,7 +98,8 @@ double randAOrB(double a, double b) {
     return (rand()%2) * (b-a) + a;
 }
 
-int triangulation::matrixCorr(Mat &pointsLut, Mat &pointsCorr, Mat lutSrc, Mat lutDst) {
+// camproj: 0=cam, 1=proj. Sert pour sauvegarder le mask
+int triangulation::matrixCorr(Mat &pointsLut, Mat &pointsCorr, Mat lutSrc, Mat lutDst,int camproj,Mat &pointIdx) {
 
     int lutSrc_r = lutSrc.rows;
     int lutSrc_c = lutSrc.cols;
@@ -125,15 +128,22 @@ int triangulation::matrixCorr(Mat &pointsLut, Mat &pointsCorr, Mat lutSrc, Mat l
     }
     cout << endl << n << " pixels sélectionnés!" << endl;
 
-    imwrite(fn_tr_mask, mask);
+    if( camproj==0 ) imwrite(fn_tr_mask_cam, mask);
+    else imwrite(fn_tr_mask_proj, mask);
 
     pointsLut = Mat::zeros(2, n, CV_64F);
     pointsCorr = Mat::zeros(2, n, CV_64F);
+    pointIdx = Mat::zeros(lutSrc_r, lutSrc_c, CV_32SC1);
+
 
     n=0;
     for(int r=0; r<lutSrc_r; r++) {
         for(int c=0; c<lutSrc_c; c++) {
-            if(mask.at<uchar>(r, c) == 0) continue;
+            if(mask.at<uchar>(r, c) == 0) {
+                pointIdx.at<int>(r, c)=-1;
+                continue;
+            }
+            pointIdx.at<int>(r, c)=n;
 
             //valeur aléatoire [-1,1]
             //srand(time(NULL));
@@ -180,7 +190,7 @@ void triangulation::undistortMatrix(Mat &pointsOutput, Mat pointsInput, Mat inte
 }
 
 int triangulation::lut2corr(Mat lutSrc, Mat internesSrc, Mat distCoeffsSrc, Mat &pointsUndSrc,
-         Mat lutDst, Mat internesDst, Mat distCoeffsDst, Mat &pointsUndDst) {
+         Mat lutDst, Mat internesDst, Mat distCoeffsDst, Mat &pointsUndDst,int camproj,Mat &pointIdx) {
 
     Mat pointsSrc;
     Mat pointsDst;
@@ -189,7 +199,7 @@ int triangulation::lut2corr(Mat lutSrc, Mat internesSrc, Mat distCoeffsSrc, Mat 
     cout << "Taille des Luts :" << endl;
     cout << "--------------------------" << endl;
 
-    int size = matrixCorr(pointsSrc, pointsDst, lutSrc, lutDst);
+    int size = matrixCorr(pointsSrc, pointsDst, lutSrc, lutDst,camproj,pointIdx);
 
     cout << endl << endl;
     cout << "--------------------------" << endl;
@@ -204,9 +214,9 @@ int triangulation::lut2corr(Mat lutSrc, Mat internesSrc, Mat distCoeffsSrc, Mat 
     return size;
 }
 
-int triangulation::saveMat(Mat point4D) {
+int triangulation::saveMat(const char *name,Mat point4D) {
 
-    FileStorage fsS(fn_tr_data, FileStorage::WRITE);
+    FileStorage fsS(name, FileStorage::WRITE);
     if(!fsS.isOpened()) {
         cout << "Erreur! Le fichier Save n'est pas ouvert! \n" << endl;
         return -1;
@@ -218,6 +228,87 @@ int triangulation::saveMat(Mat point4D) {
 
     return 0;
 }
+
+int triangulation::saveSTL(const char *name,Mat point4D,Mat pointIdx) {
+    FILE *F=fopen(name,"w");
+    if( F==NULL ) { printf("Impossible d'ouvrir %s\n",name);return(-1); }
+
+	int nr=pointIdx.rows;
+	int nc=pointIdx.cols;
+
+	fprintf(F,"solid v3d\n");
+
+	double xA,yA,zA,w;
+	double xB,yB,zB;
+	double xC,yC,zC;
+	double xD,yD,zD;
+	int idxA,idxB,idxC,idxD;
+	for(int r=0; r<nr-1; r++) {
+        for(int c=0; c<nc-1; c++) {
+            idxA=pointIdx.at<int>(r, c);
+            idxB=pointIdx.at<int>(r, c+1);
+            idxC=pointIdx.at<int>(r+1, c);
+            idxD=pointIdx.at<int>(r+1, c+1);
+
+			if( idxA>=0 ) {
+				w = point4D.at<double>(3,idxA);
+				xA = point4D.at<double>(0,idxA)/w;
+				yA = point4D.at<double>(1,idxA)/w;
+				zA = point4D.at<double>(2,idxA)/w;
+			}
+			if( idxB>=0 ) {
+				w = point4D.at<double>(3,idxB);
+				xB = point4D.at<double>(0,idxB)/w;
+				yB = point4D.at<double>(1,idxB)/w;
+				zB = point4D.at<double>(2,idxB)/w;
+			}
+			if( idxC>=0 ) {
+				w = point4D.at<double>(3,idxC);
+				xC = point4D.at<double>(0,idxC)/w;
+				yC = point4D.at<double>(1,idxC)/w;
+				zC = point4D.at<double>(2,idxC)/w;
+			}
+			if( idxD>=0 ) {
+				w = point4D.at<double>(3,idxD);
+				xD = point4D.at<double>(0,idxD)/w;
+				yD = point4D.at<double>(1,idxD)/w;
+				zD = point4D.at<double>(2,idxD)/w;
+			}
+
+			if( idxA>=0 && idxB>=0 && idxC>=0 ) {
+ 				fprintf(F,"facet normal 0 0 0\n");
+				fprintf(F,"outer loop\n");
+				fprintf(F,"vertex %12.6f %12.6f %12.6f\n",xA,yA,zA);
+				fprintf(F,"vertex %12.6f %12.6f %12.6f\n",xC,yC,zC);
+				fprintf(F,"vertex %12.6f %12.6f %12.6f\n",xB,yB,zB);
+				fprintf(F,"endloop\n");
+				fprintf(F,"endfacet\n");
+			}
+			if( idxB>=0 && idxC>=0 && idxD>=0 ) {
+ 				fprintf(F,"facet normal 0 0 0\n");
+				fprintf(F,"outer loop\n");
+				fprintf(F,"vertex %12.6f %12.6f %12.6f\n",xB,yB,zB);
+				fprintf(F,"vertex %12.6f %12.6f %12.6f\n",xC,yC,zC);
+				fprintf(F,"vertex %12.6f %12.6f %12.6f\n",xD,yD,zD);
+				fprintf(F,"endloop\n");
+				fprintf(F,"endfacet\n");
+			}
+/*
+  vertex -56.1573 -22.6431 21.6972
+  vertex -55.6515 -22.6336 21.7902
+  vertex -56.2969 -23.1655 21.9234
+*/
+		}
+	}
+
+
+	fprintf(F,"endsolid v3d\n");
+
+    fclose(F);
+
+    return(0);
+}
+
 
 
 void triangulation::triangulate(Mat lutCam, Mat lutProj) {
@@ -268,26 +359,29 @@ void triangulation::triangulate(Mat lutCam, Mat lutProj) {
 
     Mat pointsUndLut;
     Mat pointsUndCorr;
-    Mat point4D;
+    Mat point4Dcam;
+    Mat point4Dproj;
     int size;
 
+    Mat pointIdxCam;
+    Mat pointIdxProj;
+
     //Triangulation
-    if(TR_CAM) {
+    // CAM en premier
         /* Cam -> Proj */
         size = lut2corr(lutCam,  internes_cam,  distCoeffs_cam,  pointsUndLut,
-                   lutProj, internes_proj, distCoeffs_proj, pointsUndCorr);
+                   lutProj, internes_proj, distCoeffs_proj, pointsUndCorr,0,pointIdxCam);
 
-        point4D = Mat::zeros(4, size, CV_64F);
-        triangulatePoints(poseMatrix_cam, poseMatrix_proj, pointsUndLut, pointsUndCorr, point4D);
-    }
-    else {
+        point4Dcam = Mat::zeros(4, size, CV_64F);
+        triangulatePoints(poseMatrix_cam, poseMatrix_proj, pointsUndLut, pointsUndCorr, point4Dcam);
+
+    // PROJ en second
         /* Proj -> Cam */
         size = lut2corr(lutProj, internes_proj, distCoeffs_proj, pointsUndLut,
-                   lutCam,  internes_cam,  distCoeffs_cam,  pointsUndCorr);
+                   lutCam,  internes_cam,  distCoeffs_cam,  pointsUndCorr,1,pointIdxProj);
 
-        point4D = Mat::zeros(4, size, CV_64F);
-        triangulatePoints(poseMatrix_proj, poseMatrix_cam, pointsUndLut, pointsUndCorr, point4D);
-    }
+        point4Dproj = Mat::zeros(4, size, CV_64F);
+        triangulatePoints(poseMatrix_proj, poseMatrix_cam, pointsUndLut, pointsUndCorr, point4Dproj);
 
     //Display Coordinates
     cout << endl << endl;
@@ -296,8 +390,10 @@ void triangulation::triangulate(Mat lutCam, Mat lutProj) {
     cout << "--------------------------" << endl;
 
 
-    cout << point4D.rows << "    " << point4D.cols << endl;
+    cout << "CAM: "<<point4Dcam.rows << "    " << point4Dcam.cols << endl;
+    cout << "PROJ:"<<point4Dproj.rows << "    " << point4Dproj.cols << endl;
 
+    /*
     double w, x, y, z;
     for(int c=0; c<point4D.cols; c+=(point4D.cols/2)) {
 
@@ -308,10 +404,14 @@ void triangulation::triangulate(Mat lutCam, Mat lutProj) {
 
         cout << x << ", " << y << ", " << z << endl;
     }
+    */
 
     //Save
-    saveMat(point4D);
+    saveMat(fn_tr_data_cam,point4Dcam);
+    saveMat(fn_tr_data_proj,point4Dproj);
 
+    saveSTL("../triangule/outcam.stl",point4Dcam,pointIdxCam);
+    saveSTL("../triangule/outproj.stl",point4Dproj,pointIdxProj);
 }
 
 
@@ -320,8 +420,10 @@ void triangulation::setPathT(int idx,string path,const char *filename) {
     string newfilename = path + (string) filename;
 
     switch( idx ) {
-        case IDX_TR_MASK : fn_tr_mask=strdup(newfilename.c_str());break;
-        case IDX_TR_DATA : fn_tr_data=strdup(newfilename.c_str());break;
+        case IDX_TR_MASK_CAM : fn_tr_mask_cam=strdup(newfilename.c_str());break;
+        case IDX_TR_MASK_PROJ : fn_tr_mask_proj=strdup(newfilename.c_str());break;
+        case IDX_TR_DATA_CAM : fn_tr_data_cam=strdup(newfilename.c_str());break;
+        case IDX_TR_DATA_PROJ : fn_tr_data_proj=strdup(newfilename.c_str());break;
         case IDX_TR_PARC : fn_tr_parc=strdup(newfilename.c_str());break;
         case IDX_TR_PARP : fn_tr_parp=strdup(newfilename.c_str());break;
         default: printf("setPathT: code %d inconnu!!!!!!!!!\n",idx); break;

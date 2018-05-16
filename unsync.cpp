@@ -144,8 +144,8 @@ int main(int argc, char *argv[]) {
     else {
         printf("----- Pas de scan -----\n");
 
-        lutCam  = imread((path+FN_SCAN_LUTC) , CV_LOAD_IMAGE_UNCHANGED);
-        lutProj =  imread((path+FN_SCAN_LUTP), CV_LOAD_IMAGE_UNCHANGED);
+        lutCam  = imread(("../triangule/lutcam.png") , CV_LOAD_IMAGE_UNCHANGED);
+        lutProj =  imread(("../triangule/lutproj.png"), CV_LOAD_IMAGE_UNCHANGED);
     }
 
     /* ----------------------- Triangulation ----------------------- */
@@ -154,10 +154,21 @@ int main(int argc, char *argv[]) {
 
         string pathvide="";
         //Paths
+        /*
         T->setPathT(IDX_TR_MASK,path,FN_TR_MASK);
         T->setPathT(IDX_TR_DATA,path,FN_TR_DATA);
         T->setPathT(IDX_TR_PARC,path,FN_TR_PARC);
         T->setPathT(IDX_TR_PARP,path,FN_TR_PARP);
+        */
+        // input
+        T->setPathT(IDX_TR_PARC,"../triangule/","out_camera_data.xml");
+        T->setPathT(IDX_TR_PARP,"../triangule/","out_projector_data.xml");
+        // output
+        T->setPathT(IDX_TR_MASK_CAM,"../triangule/","maskCam.png");
+        T->setPathT(IDX_TR_MASK_PROJ,"../triangule/","maskProj.png");
+        T->setPathT(IDX_TR_DATA_CAM,"../triangule/","dataCam.xml");
+        T->setPathT(IDX_TR_DATA_PROJ,"../triangule/","dataProj.xml");
+
 
         T->triangulate(lutCam, lutProj);
         delete T;
